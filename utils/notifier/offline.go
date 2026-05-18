@@ -3,6 +3,7 @@ package notifier
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,34 @@ import (
 	"github.com/komari-monitor/komari/utils/messageSender"
 	"github.com/komari-monitor/komari/utils/renewal"
 )
+
+func buildClientInfo(client models.Client) string {
+	var parts []string
+	if client.IPv4 != "" {
+		parts = append(parts, fmt.Sprintf("IP: %s", client.IPv4))
+	}
+	if client.IPv6 != "" {
+		parts = append(parts, fmt.Sprintf("IPv6: %s", client.IPv6))
+	}
+	osInfo := client.OS
+	if client.Arch != "" {
+		osInfo = fmt.Sprintf("%s %s", osInfo, client.Arch)
+	}
+	if osInfo != "" {
+		parts = append(parts, fmt.Sprintf("OS: %s", osInfo))
+	}
+	if client.Region != "" {
+		parts = append(parts, fmt.Sprintf("Region: %s", client.Region))
+	}
+	if client.CpuCores > 0 {
+		cpuInfo := fmt.Sprintf("CPU: %d cores", client.CpuCores)
+		if client.CpuName != "" {
+			cpuInfo = fmt.Sprintf("CPU: %s (%d cores)", client.CpuName, client.CpuCores)
+		}
+		parts = append(parts, cpuInfo)
+	}
+	return strings.Join(parts, "\n")
+}
 
 // notificationState 保存单个客户端的通知状态。
 // 通过在结构体中嵌入互斥锁，实现每个客户端细粒度的锁定，比全局锁更高效。
@@ -108,14 +137,14 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 		state.isConnExist = false
 
 		// Send notification
-		message := fmt.Sprintf("🔴%s is offline", client.Name)
+		message := fmt.Sprintf("🔴 %s is offline\n%s", client.Name, buildClientInfo(client))
 		go func(msg string) {
 			if err := messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Offline,
 				Clients: []models.Client{client},
 				Time:    time.Now(),
-				//Message: msg,
-				Emoji: "🔴",
+				Message: msg,
+				Emoji:   "🔴",
 			}); err != nil {
 				log.Println("Failed to send offline notification:", err)
 			}
@@ -155,12 +184,13 @@ func OnlineNotification(clientID string, connectionID int64) {
 		state.pendingOfflineSince = time.Time{}
 		state.isConnExist = true
 
-		message := fmt.Sprintf("🆕%s has been registered", client.Name)
+		message := fmt.Sprintf("🆕 %s registered\n%s", client.Name, buildClientInfo(client))
 		go func(msg string) {
 			if err := messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Registered,
 				Clients: []models.Client{client},
 				Time:    time.Now(),
+				Message: msg,
 				Emoji:   "🆕",
 			}); err != nil {
 				log.Println("Failed to send registered notification:", err)
@@ -189,14 +219,14 @@ func OnlineNotification(clientID string, connectionID int64) {
 	}
 
 	// 规则4：客户端离线足够久已通知（或未待离线），现在重新上线，发送上线通知。
-	message := fmt.Sprintf("🟢%s is online", client.Name)
+	message := fmt.Sprintf("🟢 %s is online\n%s", client.Name, buildClientInfo(client))
 	go func(msg string) {
 		if err := messageSender.SendEvent(models.EventMessage{
 			Event:   messageevent.Online,
 			Clients: []models.Client{client},
 			Time:    time.Now(),
-			//Message: msg,
-			Emoji: "🟢",
+			Message: msg,
+			Emoji:   "🟢",
 		}); err != nil {
 			log.Println("Failed to send online notification:", err)
 		}
