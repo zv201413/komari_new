@@ -66,7 +66,10 @@ func Initialize() {
 		LoadProvider("empty", "{}")
 		return
 	}
-	LoadProvider(NotificationMethod, senderConfig.Addition)
+	if err := LoadProvider(NotificationMethod, senderConfig.Addition); err != nil {
+		log.Printf("Failed to load provider %s: %v, falling back to empty provider", NotificationMethod, err)
+		LoadProvider("empty", "{}")
+	}
 }
 
 func SendTextMessage(message string, title string) error {

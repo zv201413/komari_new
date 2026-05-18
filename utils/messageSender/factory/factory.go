@@ -2,6 +2,7 @@ package factory
 
 import (
 	"log"
+	"strings"
 
 	"github.com/komari-monitor/komari/utils/item"
 )
@@ -9,25 +10,41 @@ import (
 var (
 	senders                = make(map[string]IMessageSender)
 	senderConstructor      = make(map[string]MessageSenderConstructor)
+	senderConstructorLower = make(map[string]string) // lowercase name -> canonical name
 	sendersAdditionalItems = make(map[string][]item.Item)
 )
 
 func RegisterMessageSender(constructor MessageSenderConstructor) {
 	sender := constructor()
-	senderConstructor[sender.GetName()] = constructor
 	if sender == nil {
 		panic("Message sender constructor returned nil")
 	}
-	if _, exists := senders[sender.GetName()]; exists {
-		log.Println("Message sender already registered: " + sender.GetName())
+	name := sender.GetName()
+	senderConstructor[name] = constructor
+	senderConstructorLower[strings.ToLower(name)] = name
+	if _, exists := senders[name]; exists {
+		log.Println("Message sender already registered: " + name)
 	}
-	senders[sender.GetName()] = sender
+	senders[name] = sender
 
 	// 使用反射来提取提供程序的配置字段
 	config := sender.GetConfiguration()
 	items := item.Parse(config)
 
-	sendersAdditionalItems[sender.GetName()] = items
+	sendersAdditionalItems[name] = items
+}
+
+func GetConstructor(name string) (MessageSenderConstructor, bool) {
+	constructor, exists := senderConstructor[name]
+	if exists {
+		return constructor, true
+	}
+	// 大小写不敏感 fallback：用小写名查找规范名
+	if canonical, ok := senderConstructorLower[strings.ToLower(name)]; ok {
+		log.Printf("Provider name '%s' matched '%s' (case-insensitive)", name, canonical)
+		return senderConstructor[canonical], true
+	}
+	return nil, false
 }
 
 func GetSenderConfigs() map[string][]item.Item {
@@ -36,11 +53,6 @@ func GetSenderConfigs() map[string][]item.Item {
 
 func GetAllMessageSenders() map[string]IMessageSender {
 	return senders
-}
-
-func GetConstructor(name string) (MessageSenderConstructor, bool) {
-	constructor, exists := senderConstructor[name]
-	return constructor, exists
 }
 
 func GetAllMessageSenderNames() []string {

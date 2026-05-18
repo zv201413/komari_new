@@ -71,6 +71,8 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 		gracePeriod = 5 * time.Minute // 默认宽限期
 	}
 
+	log.Printf("[diagnostic] OfflineNotification for %s: DB grace_period=%d, effective gracePeriod=%v", clientID, notiConf.GracePeriod, gracePeriod)
+
 	now := time.Now()
 	state := getOrInitState(clientID)
 

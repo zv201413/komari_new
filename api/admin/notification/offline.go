@@ -89,7 +89,7 @@ func EditOfflineNotification(c *gin.Context) {
 			Columns:   []clause.Column{{Name: "client"}},
 			DoUpdates: clause.AssignmentColumns([]string{"enable", "grace_period"}),
 		}).
-		Select("*").
+		Select("client", "enable", "grace_period").
 		Create(notifications).Error
 	if err != nil {
 		api.RespondError(c, 500, "Failed to edit offline notifications: "+err.Error())
