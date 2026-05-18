@@ -151,5 +151,5 @@ jobs:
             BINARY_NAME=${BINARY_NAME}.exe
           fi
           # Upload the binary as a release asset using GitHub CLI
-          gh release upload ${{ github.event.release.tag_name }} $BINARY_NAME --repo ${{ github.repository }}
+          gh release upload ${{ steps.release_tag.outputs.tag }} $BINARY_NAME --repo ${{ github.repository }}
         shell: bash
