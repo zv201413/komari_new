@@ -1,20 +1,31 @@
 package test
 
 import (
+	"fmt"
 	"net"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
+	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/geoip"
 	"github.com/komari-monitor/komari/utils/messageSender"
 )
 
 func TestSendMessage(c *gin.Context) {
+	sitename, _ := config.GetAs[string](config.SitenameKey, "Komari")
+	allClients, _ := clients.GetAllClientBasicInfo()
+
+	msg := fmt.Sprintf("🧪 Test message from %s v%s\nTotal nodes: %d\nTime: %s",
+		sitename, utils.CurrentVersion, len(allClients), time.Now().Format(time.RFC3339))
+
 	err := messageSender.SendEvent(models.EventMessage{
 		Event:   "Test",
-		Message: "This is a test message from Komari.",
+		Message: msg,
+		Time:    time.Now(),
 	})
 	if err != nil {
 		api.RespondError(c, 500, "Failed to send message: "+err.Error())

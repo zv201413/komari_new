@@ -148,12 +148,24 @@ func OnlineNotification(clientID string, connectionID int64) {
 	defer state.mu.Unlock()
 	state.connectionID = connectionID
 
-	// 规则1：首次连接不通知。
+	// 规则1：首次连接 → 发送 Registered 通知。
 	if state.isFirstConnection {
 		state.isFirstConnection = false
 		// 同时清除任何待离线状态（如服务器重启时客户端本已离线）
 		state.pendingOfflineSince = time.Time{}
 		state.isConnExist = true
+
+		message := fmt.Sprintf("🆕%s has been registered", client.Name)
+		go func(msg string) {
+			if err := messageSender.SendEvent(models.EventMessage{
+				Event:   messageevent.Registered,
+				Clients: []models.Client{client},
+				Time:    time.Now(),
+				Emoji:   "🆕",
+			}); err != nil {
+				log.Println("Failed to send registered notification:", err)
+			}
+		}(message)
 		return
 	}
 

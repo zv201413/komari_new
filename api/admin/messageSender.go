@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
@@ -52,8 +54,7 @@ func SetMessageSenderProvider(c *gin.Context) {
 	}
 	NotificationMethod, _ := config.GetAs[string](config.NotificationMethodKey, "none")
 
-	// 正在使用，重载
-	if NotificationMethod == senderConfig.Name {
+	if strings.EqualFold(NotificationMethod, senderConfig.Name) {
 		err := messageSender.LoadProvider(senderConfig.Name, senderConfig.Addition)
 		if err != nil {
 			api.RespondError(c, 500, "Failed to load message sender provider: "+err.Error())
