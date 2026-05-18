@@ -19,11 +19,12 @@ func TestSendMessage(c *gin.Context) {
 	sitename, _ := config.GetAs[string](config.SitenameKey, "Komari")
 	allClients, _ := clients.GetAllClientBasicInfo()
 
-	msg := fmt.Sprintf("🧪 Test message from %s v%s\nTotal nodes: %d\nTime: %s",
-		sitename, utils.CurrentVersion, len(allClients), time.Now().Format(time.RFC3339))
+	msg := fmt.Sprintf("🧪 Test message from %s %s\nTotal nodes: %d",
+		sitename, utils.CurrentVersion, len(allClients))
 
 	err := messageSender.SendEvent(models.EventMessage{
 		Event:   "Test",
+		Clients: allClients,
 		Message: msg,
 		Time:    time.Now(),
 	})
