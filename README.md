@@ -1,144 +1,100 @@
 # Komari
 
-![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fkomari-monitor%2Fkomari&label=&icon=github&color=%23a370f7&message=&style=flat&tz=UTC)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/komari-monitor/komari)
+Komari 是一款轻量级服务器监控工具，支持通过网页面板查看服务器状态，通过轻量 Agent 采集数据。
 
-![komari](https://socialify.git.ci/komari-monitor/komari/image?description=1&font=Inter&forks=1&issues=1&language=1&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fkomari-monitor%2Fkomari-web%2Fd54ce1288df41ead08aa19f8700186e68028a889%2Fpublic%2Ffavicon.png&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto)
+## 生态概览
+
+本组织维护以下四个仓库，它们共同组成 Komari 监控体系：
+
+| 仓库 | 作用 | 用户需要操作？ |
+|------|------|:---:|
+| [`komari_new`](https://github.com/zv201413/komari_new) | 监控面板服务端（Go 二进制） | ✅ 必须部署 |
+| [`komari-agent_new`](https://github.com/zv201413/komari-agent_new) | 探针 Agent（安装在被监控的机器上） | ✅ 每台机器装 |
+| [`Komari_ttyd`](https://github.com/zv201413/Komari_ttyd) | Docker 一体镜像（面板 + 网页终端） | ✅ 替代方案 |
+| [`komari-web_new`](https://github.com/zv201413/komari-web_new) | 前端 UI 源码 | ❌ 已编译进 server |
 
 [简体中文](./docs/README_zh.md) | [繁體中文](./docs/README_zh-TW.md) | [日本語](./docs/README_ja.md)
 
-Komari is a lightweight, self-hosted server monitoring tool designed to provide a simple and efficient solution for monitoring server performance. It supports viewing server status through a web interface and collects data through a lightweight agent.
-
-[Documentation](https://komari-document.pages.dev/) | [文档(镜像站 By Geekertao)](https://www.komari.wiki) | [Telegram Group](https://t.me/komari_monitor)
-
-## Features
-
-- **Lightweight and Efficient**: Low resource consumption, suitable for servers of all sizes.
-- **Self-hosted**: Complete control over data privacy, easy to deploy.
-- **Web Interface**: Intuitive monitoring dashboard, easy to use.
-
-> 📖 **Fork 安装指南**: [`install.md`](./install.md) — 涵盖 Server v1.4.0、Agent v1.4.1、Docker 部署
+📖 **详细安装说明**: [`install.md`](./install.md)
 
 ## Quick Start
 
-### 0. One-click Deployment with Cloud Hosting
-
-- Rainyun - CNY 4.5/month
-
-[![](https://rainyun-apps.cn-nb1.rains3.com/materials/deploy-on-rainyun-cn.svg)](https://app.rainyun.com/apps/rca/store/6780/NzYxNzAz_)
-
-- 1Panel App Store
-
-Available on 1Panel App Store. Install via **App Store > Utilities > Komari**.
-
-### 1. Use the One-click Install Script
-
-Suitable for distributions using systemd (Ubuntu, Debian...).
+### Option A: Deploy Server (Binary)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/komari-monitor/komari/main/install-komari.sh -o install-komari.sh
-chmod +x install-komari.sh
-sudo ./install-komari.sh
+# 1. 下载最新 server 二进制
+wget -qO /opt/komari/komari https://github.com/zv201413/komari_new/releases/latest/download/komari-linux-amd64
+chmod +x /opt/komari/komari
+
+# 2. 创建 systemd 服务
+cat > /etc/systemd/system/komari.service << 'SERVICE'
+[Unit]
+Description=Komari Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/komari/komari server -l 0.0.0.0:25774
+WorkingDirectory=/opt/komari
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload && systemctl enable --now komari
 ```
 
-### 2. Docker Deployment
+### Option B: Deploy Server (Docker)
 
-1. Create a data directory:
-   ```bash
-   mkdir -p ./data
-   ```
-2. Run the Docker container:
-   ```bash
-   docker run -d \
-     -p 25774:25774 \
-     -v $(pwd)/data:/app/data \
-     --name komari \
-     ghcr.io/komari-monitor/komari:latest
-   ```
-3. View the default username and password:
-   ```bash
-   docker logs komari
-   ```
-4. Access `http://<your_server_ip>:25774` in your browser.
+```bash
+docker run -d --name komari \
+  --restart unless-stopped \
+  -p 25774:25774 \
+  -v /opt/komari/data:/app/data \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=your_password \
+  ghcr.io/zv201413/komari_ttyd:latest
+```
 
-> [!NOTE]
-> You can also customize the initial username and password through the environment variables `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+> 首次登录的用户名密码见容器日志：`docker logs komari`
 
-### 3. Binary File Deployment
+### Install Agent (on every server to monitor)
 
-1. Visit Komari's [GitHub Release page](https://github.com/komari-monitor/komari/releases) to download the latest binary for your operating system.
-2. Run Komari:
-   ```bash
-   ./komari server -l 0.0.0.0:25774
-   ```
-3. Access `http://<your_server_ip>:25774` in your browser. The default port is `25774`.
-4. The default username and password can be found in the startup logs or set via the environment variables `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+```bash
+curl -fsSL https://github.com/zv201413/komari-agent_new/releases/latest/download/install.sh \
+  | bash -s -- -e https://your-server.com:25774 -t your_agent_secret
+```
 
-> [!NOTE]
-> Ensure the binary has execute permissions (`chmod +x komari`). Data will be saved in the `data` folder in the running directory.
+### Upgrade
 
-### Manual Build
+```bash
+# Server
+wget -qO /opt/komari/komari https://github.com/zv201413/komari_new/releases/latest/download/komari-linux-amd64
+chmod +x /opt/komari/komari && systemctl restart komari
 
-#### Dependencies
+# Agent — 重跑 install.sh 即可自动更新
+```
 
-- Go 1.18+ and Node.js 20+ (for manual build)
+## Releases
 
-1. Build the frontend static files:
-   ```bash
-   git clone https://github.com/komari-monitor/komari-web
-   cd komari-web
-   npm install
-   npm run build
-   ```
-2. Build the backend:
-   ```bash
-   git clone https://github.com/komari-monitor/komari
-   cd komari
-   ```
-   Copy the static files generated in step 1 to the `/public/defaultTheme/dist` folder in the root of the `komari` project, and copy `komari-theme.json` + `preview.png`/`perview.png` to `/public/defaultTheme`.
-   ```bash
-   go build -o komari
-   ```
-3. Run:
-   ```bash
-   ./komari server -l 0.0.0.0:25774
-   ```
-   The default listening port is `25774`. Access `http://localhost:25774`.
+- [komari_new Releases](https://github.com/zv201413/komari_new/releases) — Server 二进制
+- [komari-agent_new Releases](https://github.com/zv201413/komari-agent_new/releases) — Agent + install.sh
+- [Komari_ttyd Packages](https://github.com/zv201413/Komari_ttyd/pkgs/container/komari_ttyd) — Docker 镜像
 
-## Frontend Development Guide
+## Manual Build
 
-[Komari Theme Development Guide | Komari](https://komari-document.pages.dev/dev/theme.html)
+```bash
+# 前端（komari-web_new）
+git clone https://github.com/zv201413/komari-web_new
+cd komari-web_new
+npm install && npm run build
+# 编译产物在 public/defaultTheme/dist/
 
-## Client Agent Development Guide
-
-[Komari Agent Information Reporting and Event Handling Documentation](https://komari-document.pages.dev/dev/agent.html)
-
-## Contributing
-
-Issues and Pull Requests are welcome!
-
-## Acknowledgements
-
-### 破碎工坊云
-
-[破碎工坊云 - 专业云计算服务平台，提供高效、稳定、安全的高防服务器与CDN解决方案](https://www.crash.work/)
-
-### DreamCloud
-
-[DreamCloud - 极高性价比解锁直连亚太高防](https://as211392.com/)
-
-### 🚀 Sponsored by SharonNetworks
-
-[![Sharon Networks](https://raw.githubusercontent.com/komari-monitor/public/refs/heads/main/images/sharon-networks.webp)](https://sharon.io)
-
-SharonNetworks 为您的业务起飞保驾护航！
-
-亚太数据中心提供顶级的中国优化网络接入 · 低延时&高带宽&提供Tbps级本地清洗高防服务, 为您的业务保驾护航, 为您的客户提供极致体验. 加入社区 [Telegram群组](https://t.me/SharonNetwork) 可参与公益募捐或群内抽奖免费使用
-
-### The open source software community
-
-All the developers who submitted PRs and created themes
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=komari-monitor/komari&type=Date)](https://www.star-history.com/#komari-monitor/komari&Date)
+# 服务端
+git clone https://github.com/zv201413/komari_new
+cd komari_new
+cp -r ../komari-web_new/public/defaultTheme/dist public/defaultTheme/
+go build -o komari
+```
