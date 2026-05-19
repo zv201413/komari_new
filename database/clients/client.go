@@ -75,6 +75,9 @@ func UpdateOrInsertBasicInfo(cbi common.ClientInfo) error {
 	updates["swap_total"] = cbi.SwapTotal
 	updates["disk_total"] = cbi.DiskTotal
 	updates["version"] = cbi.Version
+	if cbi.TcpCc != "" {
+		updates["tcp_cc"] = cbi.TcpCc
+	}
 	updates["updated_at"] = time.Now()
 
 	// 转换为更新Client表
@@ -101,6 +104,7 @@ func UpdateOrInsertBasicInfo(cbi common.ClientInfo) error {
 		"swap_total": cbi.SwapTotal,
 		"disk_total": cbi.DiskTotal,
 		"version":    cbi.Version,
+		"tcp_cc":     cbi.TcpCc,
 		"updated_at": time.Now(),
 	}).Error
 
