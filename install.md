@@ -64,6 +64,8 @@ chmod +x /tmp/install.sh
 bash /tmp/install.sh
 ```
 
+> 支持非 root 环境（容器/PaaS）：自动降级到 `~/.komari` 目录，使用 nohup 后台模式运行。
+
 ### 从旧版升级
 
 同上，重新跑一遍安装脚本即可自动替换为最新版。
