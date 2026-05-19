@@ -17,6 +17,8 @@ Komari is a lightweight, self-hosted server monitoring tool designed to provide 
 - **Self-hosted**: Complete control over data privacy, easy to deploy.
 - **Web Interface**: Intuitive monitoring dashboard, easy to use.
 
+> 📖 **Fork 安装指南**: [`install.md`](./install.md) — 涵盖 Server v1.4.0、Agent v1.4.1、Docker 部署
+
 ## Quick Start
 
 ### 0. One-click Deployment with Cloud Hosting
