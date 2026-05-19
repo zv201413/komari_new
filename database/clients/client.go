@@ -50,7 +50,7 @@ func UpdateOrInsertBasicInfo(cbi common.ClientInfo) error {
 	if cbi.Arch != "" {
 		updates["arch"] = cbi.Arch
 	}
-	if cbi.CpuCores > 0 || cbi.CpuCores < math.MaxInt-1 {
+	if cbi.CpuCores > 0 {
 		updates["cpu_cores"] = cbi.CpuCores
 	}
 	if cbi.OS != "" {
@@ -134,8 +134,8 @@ func SaveClientInfo(update map[string]interface{}) error {
 	}
 
 	verify := func(update map[string]interface{}) error {
-		if update["cpu_cores"].(float64) < 0 || update["cpu_cores"].(float64) > math.MaxInt-1 {
-			return fmt.Errorf("Cpu.Cores be not a valid int64 number: %d", update["cpu_cores"])
+		if update["cpu_cores"].(float64) < 0 {
+			return fmt.Errorf("Cpu.Cores must be non-negative, got %v", update["cpu_cores"])
 		}
 		if err := checkInt64("Ram.Total", update["mem_total"].(float64)); err != nil {
 			return err

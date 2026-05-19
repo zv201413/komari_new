@@ -36,7 +36,7 @@ type ClientInfo struct {
 	CpuName        string    `json:"cpu_name" gorm:"type:varchar(100)"`
 	Virtualization string    `json:"virtualization" gorm:"type:varchar(50)"`
 	Arch           string    `json:"arch" gorm:"type:varchar(50)"`
-	CpuCores       int       `json:"cpu_cores" gorm:"type:int"`
+	CpuCores       float64   `json:"cpu_cores" gorm:"type:real"`
 	OS             string    `json:"os" gorm:"type:varchar(100)"`
 	GpuName        string    `json:"gpu_name" gorm:"type:varchar(100)"`
 	IPv4           string    `json:"ipv4,omitempty" gorm:"type:varchar(100)"`

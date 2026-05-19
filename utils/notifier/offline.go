@@ -35,9 +35,12 @@ func buildClientInfo(client models.Client) string {
 		parts = append(parts, fmt.Sprintf("Region: %s", client.Region))
 	}
 	if client.CpuCores > 0 {
-		cpuInfo := fmt.Sprintf("CPU: %d cores", client.CpuCores)
+		coresStr := fmt.Sprintf("%.1f", client.CpuCores)
+		// Remove trailing ".0" for clean integer display
+		coresStr = strings.TrimSuffix(coresStr, ".0")
+		cpuInfo := fmt.Sprintf("CPU: %s cores", coresStr)
 		if client.CpuName != "" {
-			cpuInfo = fmt.Sprintf("CPU: %s (%d cores)", client.CpuName, client.CpuCores)
+			cpuInfo = fmt.Sprintf("CPU: %s (%s cores)", client.CpuName, coresStr)
 		}
 		parts = append(parts, cpuInfo)
 	}

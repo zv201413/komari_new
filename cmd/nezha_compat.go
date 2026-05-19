@@ -292,7 +292,7 @@ func upsertClientFromHost(uuid, secret string, h *proto.Host) error {
 		Name:           "nezha_" + uuid[0:8],
 		CpuName:        cpuName,
 		Arch:           h.Arch,
-		CpuCores:       len(h.Cpu),
+		CpuCores:       float64(len(h.Cpu)),
 		OS:             osName,
 		KernelVersion:  h.PlatformVersion,
 		Virtualization: h.Virtualization,
