@@ -33,7 +33,7 @@ go.work.sum
 .env
 
 # build
-komari_Archive/
+_Archive/
 manifest.yaml
 Project_Summary.md
 Archive_Log.md
