@@ -114,30 +114,4 @@ sudo ./install-komari.sh
 
 欢迎提交 Issue 或 Pull Request！
 
-## 鸣谢
 
-### 破碎工坊云
-
-[破碎工坊云 - 专业云计算服务平台，提供高效、稳定、安全的高防服务器与CDN解决方案](https://www.crash.work/)
-
-### DreamCloud
-
-[DreamCloud - 极高性价比解锁直连亚太高防](https://as211392.com/)
-
-### 🚀 由 SharonNetworks 赞助
-
-[![Sharon Networks](https://raw.githubusercontent.com/komari-monitor/public/refs/heads/main/images/sharon-networks.webp)](https://sharon.io)
-
-SharonNetworks 为您的业务起飞保驾护航！
-
-亚太数据中心提供顶级的中国优化网络接入 · 低延时 & 高带宽 & 提供 Tbps 级本地清洗高防服务，为您的业务保驾护航，为您的客户提供极致体验。加入社区 [Telegram 群组](https://t.me/SharonNetwork) 可参与公益募捐或群内抽奖免费使用。
-
-### 开源社区
-
-提交 PR、制作主题的各位开发者
-
-—— 以及：感谢我自己能这么闲
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=komari-monitor/komari&type=Date)](https://www.star-history.com/#komari-monitor/komari&Date)
