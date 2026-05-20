@@ -63,7 +63,7 @@ func refreshPostPresence(uuid string) {
 	// 新 POST 会话：生成 connID，标记在线，启动超时定时器
 	connID := time.Now().UnixNano()
 	ws.KeepAlivePresence(uuid, connID, readWait)
-	go notifier.OnlineNotification(uuid, connID)
+	notifier.OnlineNotification(uuid, connID)
 
 	defaultGeneration := uint64(0)
 
@@ -209,7 +209,7 @@ func WebSocketReport(c *gin.Context) {
 	}
 	ws.SetConnectedClients(uuid, conn)
 	log.Printf("Client %s is reconnect success, connID: %d", uuid, conn.ID)
-	go notifier.OnlineNotification(uuid, conn.ID)
+	notifier.OnlineNotification(uuid, conn.ID)
 	defer func() {
 		ws.DeleteClientConditionally(uuid, conn)
 		notifier.OfflineNotification(uuid, conn.ID)

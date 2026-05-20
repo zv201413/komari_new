@@ -163,21 +163,9 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 
 // OnlineNotification 在启用通知的情况下，发送客户端上线通知。
 func OnlineNotification(clientID string, connectionID int64) {
-	client, err := clients.GetClientByUUID(clientID)
-	if err != nil {
-		return
-	}
-	// 上线时检测续费
-	renewal.CheckAndAutoRenewal(client)
-	_, enabled := getNotificationConfig(clientID)
-	if !enabled {
-		return
-	}
-
 	state := getOrInitState(clientID)
 
 	state.mu.Lock()
-	defer state.mu.Unlock()
 	state.connectionID = connectionID
 
 	// 规则1：首次连接 → 发送 Registered 通知。
@@ -186,19 +174,30 @@ func OnlineNotification(clientID string, connectionID int64) {
 		// 同时清除任何待离线状态（如服务器重启时客户端本已离线）
 		state.pendingOfflineSince = time.Time{}
 		state.isConnExist = true
+		state.mu.Unlock()
 
-		message := fmt.Sprintf("🆕 %s registered\n%s", client.Name, buildClientInfo(client))
-		go func(msg string) {
+		go func() {
+			client, err := clients.GetClientByUUID(clientID)
+			if err != nil {
+				return
+			}
+			renewal.CheckAndAutoRenewal(client)
+			_, enabled := getNotificationConfig(clientID)
+			if !enabled {
+				return
+			}
+
+			message := fmt.Sprintf("🆕 %s registered\n%s", client.Name, buildClientInfo(client))
 			if err := messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Registered,
 				Clients: []models.Client{client},
 				Time:    time.Now(),
-				Message: msg,
+				Message: message,
 				Emoji:   "🆕",
 			}); err != nil {
 				log.Println("Failed to send registered notification:", err)
 			}
-		}(message)
+		}()
 		return
 	}
 
@@ -209,29 +208,55 @@ func OnlineNotification(clientID string, connectionID int64) {
 
 	// 规则2：宽限期内重连，不通知。
 	if wasPending {
+		state.mu.Unlock()
+		// 即使不通知，我们依然在后台执行续费检查
+		go func() {
+			client, err := clients.GetClientByUUID(clientID)
+			if err == nil {
+				renewal.CheckAndAutoRenewal(client)
+			}
+		}()
 		return
 	}
 
 	// 规则3: 没断开后重连, 不通知
-	// 为了解决OfflineNotify中不是全程加锁
 	if state.isConnExist {
 		log.Printf("%s has connection exist: %d", clientID, connectionID)
+		state.mu.Unlock()
+		// 即使不通知，我们依然在后台执行续费检查
+		go func() {
+			client, err := clients.GetClientByUUID(clientID)
+			if err == nil {
+				renewal.CheckAndAutoRenewal(client)
+			}
+		}()
 		return
 	} else {
 		state.isConnExist = true
 	}
+	state.mu.Unlock()
 
 	// 规则4：客户端离线足够久已通知（或未待离线），现在重新上线，发送上线通知。
-	message := fmt.Sprintf("🟢 %s is online\n%s", client.Name, buildClientInfo(client))
-	go func(msg string) {
+	go func() {
+		client, err := clients.GetClientByUUID(clientID)
+		if err != nil {
+			return
+		}
+		renewal.CheckAndAutoRenewal(client)
+		_, enabled := getNotificationConfig(clientID)
+		if !enabled {
+			return
+		}
+
+		message := fmt.Sprintf("🟢 %s is online\n%s", client.Name, buildClientInfo(client))
 		if err := messageSender.SendEvent(models.EventMessage{
 			Event:   messageevent.Online,
 			Clients: []models.Client{client},
 			Time:    time.Now(),
-			Message: msg,
+			Message: message,
 			Emoji:   "🟢",
 		}); err != nil {
 			log.Println("Failed to send online notification:", err)
 		}
-	}(message)
+	}()
 }

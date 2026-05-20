@@ -188,7 +188,7 @@ func (s *nezhaCompatServer) ReportSystemState(stream proto.NezhaService_ReportSy
 	// presence start
 	connID := time.Now().UnixNano()
 	ws.SetPresence(uuid, connID, true)
-	go notifier.OnlineNotification(uuid, connID)
+	notifier.OnlineNotification(uuid, connID)
 	defer func() {
 		ws.SetPresence(uuid, connID, false)
 		notifier.OfflineNotification(uuid, connID)
