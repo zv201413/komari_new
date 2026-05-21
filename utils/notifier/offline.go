@@ -3,6 +3,8 @@ package notifier
 import (
 	"fmt"
 	"log"
+	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,9 +37,7 @@ func buildClientInfo(client models.Client) string {
 		parts = append(parts, fmt.Sprintf("Region: %s", client.Region))
 	}
 	if client.CpuCores > 0 {
-		coresStr := fmt.Sprintf("%.1f", client.CpuCores)
-		// Remove trailing ".0" for clean integer display
-		coresStr = strings.TrimSuffix(coresStr, ".0")
+		coresStr := strconv.FormatFloat(math.Round(client.CpuCores*100)/100, 'f', -1, 64)
 		cpuInfo := fmt.Sprintf("CPU: %s cores", coresStr)
 		if client.CpuName != "" {
 			cpuInfo = fmt.Sprintf("CPU: %s (%s cores)", client.CpuName, coresStr)
