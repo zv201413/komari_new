@@ -13,9 +13,11 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 | [`Komari_ttyd`](https://github.com/zv201413/Komari_ttyd) | Docker 一体镜像（面板 + 网页终端） | ✅ 替代方案 |
 | [`komari-web_new`](https://github.com/zv201413/komari-web_new) | 前端 UI 源码 | ❌ 已编译进 server |
 
-[简体中文](./docs/README_zh.md) | [繁體中文](./docs/README_zh-TW.md) | [日本語](./docs/README_ja.md)
+[简体中文](./docs/README_zh.md) | [繁體中文](./docs/README_zh-TW.md) 
 
 📖 **详细安装说明**: [`install.md`](./install.md)
+效果展示：
+<img width="652" height="637" alt="image" src="https://github.com/user-attachments/assets/5afc92ac-1d3d-40fa-9666-8be11f02b9c8" />
 
 ## Quick Start
 
