@@ -9,7 +9,7 @@
 ### 首次安装
 
 ```bash
-# 下载 v1.4.0 二进制
+# 下载 v1.4.0 二进制（如果 wget 失败，改 curl -sL）
 wget -qO /opt/komari/komari https://github.com/zv201413/komari_new/releases/latest/download/komari-linux-amd64
 chmod +x /opt/komari/komari
 

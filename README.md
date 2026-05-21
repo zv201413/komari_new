@@ -24,7 +24,7 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 ### Option A: Deploy Server (Binary)
 
 ```bash
-# 1. 下载最新 server 二进制
+# 1. 下载最新 server 二进制（如果 wget 失败，改 curl -sL）
 wget -qO /opt/komari/komari https://github.com/zv201413/komari_new/releases/latest/download/komari-linux-amd64
 chmod +x /opt/komari/komari
 
@@ -72,7 +72,7 @@ curl -fsSL https://github.com/zv201413/komari-agent_new/releases/latest/download
 ### Upgrade
 
 ```bash
-# Server
+# Server（如果 wget 失败，改 curl -sL）
 wget -qO /opt/komari/komari https://github.com/zv201413/komari_new/releases/latest/download/komari-linux-amd64
 chmod +x /opt/komari/komari && systemctl restart komari
 
