@@ -21,7 +21,7 @@ jobs:
 
       - name: Clone and build frontend
         run: |
-          git clone https://github.com/zv201413/komari-web_new.git web
+          git clone -b radix https://github.com/zv201413/komari-web_new.git web
           cd web
           npm install
           npm run build
