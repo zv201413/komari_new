@@ -139,7 +139,7 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 		shouldReplace := true
 
 		// 特殊页面：强制使用 default 主题，且不进行内容替换
-		if strings.HasPrefix(reqPath, "/admin") || strings.HasPrefix(reqPath, "/terminal") {
+		if strings.HasPrefix(reqPath, "/admin") || strings.HasPrefix(reqPath, "/terminal") || strings.HasPrefix(reqPath, "/manage") {
 			currentTheme = DefaultTheme
 			shouldReplace = false
 		}
