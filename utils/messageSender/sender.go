@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -141,21 +143,38 @@ func SendEvent(event models.EventMessage) error {
 }
 
 func parseTemplate(messageTemplate string, event models.EventMessage) string {
-	// Aggregate client names. If Name is empty, fall back to UUID.
 	clientNames := make([]string, 0, len(event.Clients))
+	clientIPs := make([]string, 0, len(event.Clients))
+	clientOSs := make([]string, 0, len(event.Clients))
+	clientRegions := make([]string, 0, len(event.Clients))
+	clientCPUs := make([]string, 0, len(event.Clients))
+
 	for _, c := range event.Clients {
 		name := c.Name
 		if strings.TrimSpace(name) == "" {
-			// fallback to UUID when name is not set
 			name = c.UUID
 		}
 		clientNames = append(clientNames, name)
+
+		ip := c.IPv4
+		if ip == "" {
+			ip = c.IPv6
+		}
+		clientIPs = append(clientIPs, ip)
+		clientOSs = append(clientOSs, c.OS)
+		clientRegions = append(clientRegions, c.Region)
+		coresStr := strconv.FormatFloat(math.Round(c.CpuCores*100)/100, 'f', -1, 64)
+		clientCPUs = append(clientCPUs, coresStr)
 	}
 	joinedClients := strings.Join(clientNames, ", ")
 
 	replaceMap := map[string]string{
 		"{{event}}":   event.Event,
 		"{{client}}":  joinedClients,
+		"{{ip}}":      strings.Join(clientIPs, ", "),
+		"{{os}}":      strings.Join(clientOSs, ", "),
+		"{{region}}":  strings.Join(clientRegions, ", "),
+		"{{cpu}}":     strings.Join(clientCPUs, ", "),
 		"{{time}}":    event.Time.Format(time.RFC3339),
 		"{{message}}": event.Message,
 		"{{emoji}}":   event.Emoji,
