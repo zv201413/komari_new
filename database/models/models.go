@@ -38,6 +38,7 @@ type Client struct {
 	SignInIntervalDays       int       `json:"sign_in_interval_days" gorm:"default:30"`
 	SignInAlertDaysBefore    int       `json:"sign_in_alert_days_before" gorm:"default:3"`
 	SignInAlertIntervalHours int       `json:"sign_in_alert_interval_hours" gorm:"default:12"`
+	SignInTargetDate         *LocalTime `json:"sign_in_target_date" gorm:"type:timestamp"`
 	LastSignInAlertAt        LocalTime `json:"last_sign_in_alert_at" gorm:"type:timestamp"`
 	Group                    string    `json:"group" gorm:"type:varchar(100)"`
 	Tags             string    `json:"tags" gorm:"type:text"` // split by ';'

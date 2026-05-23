@@ -9,6 +9,8 @@
 *.dylib
 komari
 komari_local
+komari_new
+server.log
 __debug*
 
 # local development data

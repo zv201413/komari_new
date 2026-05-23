@@ -30,7 +30,13 @@ func ClientSignIn(c *gin.Context) {
 	}
 
 	now := time.Now()
-	newExpiredAt := now.AddDate(0, 0, client.SignInIntervalDays)
+	var newExpiredAt time.Time
+
+	if client.SignInTargetDate != nil && !client.SignInTargetDate.ToTime().IsZero() {
+		newExpiredAt = client.SignInTargetDate.ToTime()
+	} else {
+		newExpiredAt = now.AddDate(0, 0, client.SignInIntervalDays)
+	}
 
 	updates := map[string]interface{}{
 		"expired_at":            models.FromTime(newExpiredAt),
