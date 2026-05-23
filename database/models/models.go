@@ -33,8 +33,13 @@ type Client struct {
 	BillingCycle     int       `json:"billing_cycle"`
 	AutoRenewal      bool      `json:"auto_renewal" gorm:"default:false"` // 是否自动续费
 	Currency         string    `json:"currency" gorm:"type:varchar(20);default:'$'"`
-	ExpiredAt        LocalTime `json:"expired_at" gorm:"type:timestamp"`
-	Group            string    `json:"group" gorm:"type:varchar(100)"`
+	ExpiredAt                LocalTime `json:"expired_at" gorm:"type:timestamp"`
+	RequireSignIn            bool      `json:"require_sign_in" gorm:"default:false"`
+	SignInIntervalDays       int       `json:"sign_in_interval_days" gorm:"default:30"`
+	SignInAlertDaysBefore    int       `json:"sign_in_alert_days_before" gorm:"default:3"`
+	SignInAlertIntervalHours int       `json:"sign_in_alert_interval_hours" gorm:"default:12"`
+	LastSignInAlertAt        LocalTime `json:"last_sign_in_alert_at" gorm:"type:timestamp"`
+	Group                    string    `json:"group" gorm:"type:varchar(100)"`
 	Tags             string    `json:"tags" gorm:"type:text"` // split by ';'
 	Hidden           bool      `json:"hidden" gorm:"default:false"`
 	TrafficLimit     int64     `json:"traffic_limit" gorm:"type:bigint"`

@@ -270,6 +270,7 @@ func RunServer() {
 			clientGroup.GET("/list", admin.ListClients)
 			clientGroup.GET("/:uuid", admin.GetClient)
 			clientGroup.POST("/:uuid/edit", admin.EditClient)
+			clientGroup.POST("/:uuid/sign-in", admin.ClientSignIn)
 			clientGroup.POST("/:uuid/remove", admin.RemoveClient)
 			clientGroup.GET("/:uuid/token", admin.GetClientToken)
 			clientGroup.POST("/order", admin.OrderWeight)
@@ -404,6 +405,7 @@ func DoScheduledWork() {
 	//records.DeleteRecordBefore(time.Now().Add(-time.Hour * 24 * 30))
 	records.CompactRecord()
 	go notifier.CheckExpireScheduledWork()
+	go notifier.CheckSignInScheduledWork()
 	for {
 		cfg, _ := config.GetManyAs[config.Legacy]()
 		select {

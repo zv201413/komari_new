@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+komari
+komari_local
 __debug*
 
 # local development data

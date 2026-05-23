@@ -9,4 +9,5 @@ const (
 	Alert      = "Alert"
 	Traffic    = "Traffic"
 	Registered = "Registered"
+	SignIn     = "SignIn"
 )
