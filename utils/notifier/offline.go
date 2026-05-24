@@ -145,7 +145,7 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 			if err := messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Offline,
 				Clients: []models.Client{client},
-				Time:    time.Now(),
+				Time:    startTime,
 				Message: msg,
 				Emoji:   "🔴",
 			}); err != nil {
