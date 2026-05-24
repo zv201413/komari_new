@@ -41,12 +41,17 @@ func CheckSignInScheduledWork() {
 				continue
 			}
 
-			if client.ExpiredAt.ToTime().IsZero() {
-				continue
+			// Use sign_in_target_date as fallback when expired_at is not set
+			expiry := client.ExpiredAt.ToTime()
+			if expiry.IsZero() {
+				if client.SignInTargetDate == nil || client.SignInTargetDate.ToTime().IsZero() {
+					continue
+				}
+				expiry = client.SignInTargetDate.ToTime()
 			}
 
 			// Calculate absolute days left
-			daysLeft := float64(client.ExpiredAt.ToTime().Sub(now).Hours() / 24)
+			daysLeft := float64(expiry.Sub(now).Hours() / 24)
 
 			if daysLeft <= float64(client.SignInAlertDaysBefore) {
 				// Check interval
@@ -67,8 +72,12 @@ func CheckSignInScheduledWork() {
 
 		if len(notifyClients) > 0 {
 			for _, client := range notifyClients {
-				daysLeft := int(client.ExpiredAt.ToTime().Sub(now).Hours() / 24)
-				message := fmt.Sprintf("Node %s needs sign-in! It will expire in %d day(s) on %s. Please sign-in.", client.Name, daysLeft, client.ExpiredAt.ToTime().Format("2006-01-02"))
+				expiry := client.ExpiredAt.ToTime()
+				if expiry.IsZero() && client.SignInTargetDate != nil {
+					expiry = client.SignInTargetDate.ToTime()
+				}
+				daysLeft := int(expiry.Sub(now).Hours() / 24)
+				message := fmt.Sprintf("Node %s needs sign-in! It will expire in %d day(s) on %s. Please sign-in.", client.Name, daysLeft, expiry.Format("2006-01-02"))
 				
 				messageSender.SendEvent(models.EventMessage{
 					Event:   messageevent.SignIn,
