@@ -53,7 +53,7 @@ func CheckSignInScheduledWork() {
 			// Calculate absolute days left
 			daysLeft := float64(expiry.Sub(now).Hours() / 24)
 
-			if daysLeft <= float64(client.SignInAlertDaysBefore) {
+			if daysLeft <= float64(client.SignInAlertDaysBefore) || client.LastSignInAlertAt.ToTime().IsZero() {
 				// Check interval
 				intervalHours := float64(client.SignInAlertIntervalHours)
 				if intervalHours <= 0 {
