@@ -164,7 +164,11 @@ func parseTemplate(messageTemplate string, event models.EventMessage) string {
 		clientOSs = append(clientOSs, c.OS)
 		clientRegions = append(clientRegions, c.Region)
 		coresStr := strconv.FormatFloat(math.Round(c.CpuCores*100)/100, 'f', -1, 64)
-		clientCPUs = append(clientCPUs, coresStr)
+		cpuStr := coresStr + " cores"
+		if c.CpuName != "" {
+			cpuStr = c.CpuName + " (" + coresStr + " cores)"
+		}
+		clientCPUs = append(clientCPUs, cpuStr)
 	}
 	joinedClients := strings.Join(clientNames, ", ")
 

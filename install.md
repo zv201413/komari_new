@@ -117,3 +117,52 @@ docker run -d \
 | Agent | windows/amd64 | [komari-agent-windows-amd64.exe](https://github.com/zv201413/komari-agent_new/releases/latest/download/komari-agent-windows-amd64.exe) |
 
 > 完整列表见 Releases: [komari_new](https://github.com/zv201413/komari_new/releases) · [komari-agent_new](https://github.com/zv201413/komari-agent_new/releases)
+
+---
+
+## 通知推送模板
+
+通知模板支持以下变量，可在管理面板 → 通知模板中自定义显示格式：
+
+| 变量 | 说明 | 示例值 |
+|------|------|--------|
+| `{{event}}` | 事件类型 | `Offline` / `Online` / `Registered` / `SignIn` |
+| `{{client}}` | 客户端名称（多个用逗号分隔） | `vps1, vps2` |
+| `{{emoji}}` | 事件对应的 Emoji | `🔴` `🟢` `🆕` `📝` |
+| `{{ip}}` | 客户端 IP 地址（优先 IPv4） | `1.2.3.4` |
+| `{{os}}` | 操作系统 | `Ubuntu 22.04.5 LTS amd64` |
+| `{{region}}` | 地区旗帜 | `🇺🇸` |
+| `{{cpu}}` | CPU 信息（含型号和核心数） | `Intel(R) Xeon(R) Processor @ 2.60GHz (2 cores)` |
+| `{{time}}` | 事件时间（RFC3339 格式） | `2026-05-24T18:56:08+08:00` |
+| `{{message}}` | 事件消息内容 | `🔴 vps1 is offline` |
+
+### 默认模板
+
+```
+{{emoji}}{{emoji}}{{emoji}}
+Event: {{event}}
+Clients: {{client}}
+IP: {{ip}}
+OS: {{os}}
+Region: {{region}}
+CPU: {{cpu}}
+Time: {{time}}
+Message: {{message}}
+```
+
+### 自定义示例
+
+仅显示必要信息：
+
+```
+{{emoji}} {{client}} {{message}}
+Time: {{time}}
+```
+
+简洁模式：
+
+```
+{{emoji}} {{client}}: {{message}}
+```
+
+> **注意**: Registered / Offline / Online 事件的消息已不再包含 IP/OS/Region/CPU，请使用 `{{ip}}` `{{os}}` `{{region}}` `{{cpu}}` 变量按需自定义显示。
