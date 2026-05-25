@@ -227,6 +227,7 @@ func RunServer() {
 			updateGroup.POST("/user", update.UpdateUser)
 			updateGroup.PUT("/favicon", update.UploadFavicon)
 			updateGroup.POST("/favicon", update.DeleteFavicon)
+			updateGroup.POST("/image", update.UploadImage)
 		}
 		// tasks
 		taskGroup := adminAuthrized.Group("/task")
@@ -342,6 +343,8 @@ func RunServer() {
 		}
 
 	}
+	
+	r.Static("/uploads", "./data/uploads")
 
 	public.Static(r.Group("/"), func(handlers ...gin.HandlerFunc) {
 		r.NoRoute(handlers...)
