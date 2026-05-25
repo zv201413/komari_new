@@ -17,7 +17,7 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 
 📖 **详细安装说明**: [`install.md`](./install.md)
 效果展示：
-<img width="652" height="637" alt="image" src="https://github.com/user-attachments/assets/5afc92ac-1d3d-40fa-9666-8be11f02b9c8" />
+<img width="1815" height="896" alt="image" src="https://github.com/user-attachments/assets/b43eeb64-d903-4518-9f9f-607da9248436" />
 
 ## 增强特性 (vs 上游)
 
@@ -28,6 +28,8 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 - 上传后自动填充 URL，无需手动上传图床再复制链接
 - 支持格式：`image/*`（WebP、PNG、JPG、GIF、AVIF 等）、`video/*`、`.svg`
 - 上传文件 ≤ 10MB，自动检测 MIME 类型
+<img width="1485" height="519" alt="image" src="https://github.com/user-attachments/assets/934e005d-2de2-49cf-8739-bb03fd242a68" />
+
 
 ### 📱 横竖屏不同背景
 - **桌面端背景图** 和 **移动端背景图** 独立设置
