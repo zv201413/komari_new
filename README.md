@@ -19,6 +19,65 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 效果展示：
 <img width="652" height="637" alt="image" src="https://github.com/user-attachments/assets/5afc92ac-1d3d-40fa-9666-8be11f02b9c8" />
 
+## 增强特性 (vs 上游)
+
+本 Fork 在原版 Komari 基础上进行了大量增强，涵盖面板功能、Agent 能力和部署体验：
+
+### 🖼️ 图片直传
+- 在主题管理设置中，背景图和 Logo 支持**直接上传图片文件**到服务器
+- 上传后自动填充 URL，无需手动上传图床再复制链接
+- 支持格式：`image/*`（WebP、PNG、JPG、GIF、AVIF 等）、`video/*`、`.svg`
+- 上传文件 ≤ 10MB，自动检测 MIME 类型
+
+### 📱 横竖屏不同背景
+- **桌面端背景图** 和 **移动端背景图** 独立设置
+- 桌面端建议使用宽屏横图，移动端建议使用竖屏长图
+- 各自支持亮/暗模式双图（`|` 分隔）
+- 可选用视频背景，同样区分桌面端和移动端
+
+### ✅ 签到管理
+- **签到目标日期**：设置具体的签到截止日期（如 2026-05-27），到期自动提醒
+- **签到间隔天数**：按周期签到（如每 30 天）
+- **提前提醒天数**：到期前 N 天开始推送签到提醒
+- **提醒间隔**：控制提醒消息的重复频率（小时）
+- 前端 Dashboard 卡片直接显示签到截止状态（正常/即将到期/逾期）
+- 签到日志记录每次签到操作
+
+### 🌐 NAT 类型检测
+- Agent 自动检测节点的 NAT 类型，面板直接显示
+- 检测结果分类：**公网 IP** / **锥型 NAT** / **对称 NAT** / **STUN 不可达** / **UDP 阻断**
+- 基于 STUN 协议（RFC 5389），支持多服务器 fallback（Google/Cloudflare/Voipbuster）
+- 首次检测同步阻塞（~3-6s），后续保持异步更新
+
+### 🖥️ 系统信息增强
+- **TCP 拥塞算法显示**：在节点卡片上显示当前拥塞控制算法（bbr、cubic 等）
+- **CPU 精确显示**：支持浮点数精度，不再整数截断（如 0.5 核）
+- **Cgroup 内存**：容器环境下正确读取 cgroup 内存限额，而非物理内存总量
+- **负载显示**：1/5/15 分钟平均负载标量展示
+- **容器兼容**：OpenVZ/LXC 环境下自动 fallback 检测方法，避免读取被屏蔽的 proc 文件
+
+### 🔧 Agent 增强
+- **非 Root 安装**：自动降级到 `~/.komari` + nohup 后台模式
+- **自动更新**：内置 `go-github-selfupdate`，每 6h 检查新版本，自动替换二进制并重启
+- **三层保活**：Go 无限循环重连 + 系统服务重启 + 自动更新触发重启
+- **supervisord 兼容**：支持 Docker 容器内通过 supervisord 管理进程
+
+### 📦 Docker 一体镜像 (Komari_ttyd)
+- **网页终端**：集成 ttyd，支持多端口 Web 终端（设置不同用户/密码）
+- **Cloudflare Tunnel**：内置 cloudflared，一行配置即可通过 CF Tunnel 暴露服务
+- **Nginx 反向代理**：自动代理 komari 面板和 ttyd 终端
+- **Supervisor 进程管理**：多进程统一管理
+- **环境变量配置**：通过 `TTYD_P1`、`TTYD_P2`、`KOMARI_LISTEN` 等快速配置
+
+### ⚙️ 主题管理
+- 支持上传自定义主题包（`.zip`，需包含 `komari-theme.json`）
+- 主题设置页（主题管理）动态加载主题字段并渲染配置界面
+- `select-with-custom` 字段类型：下拉选择 + 自定义输入 + 图片上传
+
+### 📊 离线通知修复
+- 修复了原版偶发的离线误报问题
+- 支持自定义通知渠道（Telegram、WebHook 等）
+
 ## Quick Start
 
 ### Option A: Deploy Server (Binary)
