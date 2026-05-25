@@ -89,6 +89,11 @@ func (t LocalTime) MarshalJSON() ([]byte, error) {
 // ToTime converts UTCTime to Go's native time.Time type.
 func (t LocalTime) ToTime() time.Time { return time.Time(t) }
 
+// IsEffectivelyZero checks if the time is zero or year 1, which avoids non-UTC time.Time.IsZero() flaws.
+func (t LocalTime) IsEffectivelyZero() bool {
+	return time.Time(t).IsZero() || time.Time(t).Year() == 1
+}
+
 // FromTime converts Go's native time.Time type to UTCTime.
 func FromTime(t time.Time) LocalTime { return LocalTime(t) }
 

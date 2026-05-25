@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/database/auditlog"
@@ -45,6 +46,16 @@ func EditClient(c *gin.Context) {
 		return
 	}
 	req["uuid"] = uuid
+	
+	if v, ok := req["expired_at"]; ok {
+		if str, ok := v.(string); ok {
+			str = strings.TrimSpace(str)
+			if str == "" || str == "0001-01-01" || strings.HasPrefix(str, "0001-01-01") {
+				req["expired_at"] = nil
+			}
+		}
+	}
+
 	err := clients.SaveClient(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})

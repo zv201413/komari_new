@@ -43,8 +43,8 @@ func CheckSignInScheduledWork() {
 
 			// Use sign_in_target_date as fallback when expired_at is not set
 			expiry := client.ExpiredAt.ToTime()
-			if expiry.IsZero() {
-				if client.SignInTargetDate == nil || client.SignInTargetDate.ToTime().IsZero() {
+			if client.ExpiredAt.IsEffectivelyZero() {
+				if client.SignInTargetDate == nil || client.SignInTargetDate.IsEffectivelyZero() {
 					continue
 				}
 				expiry = client.SignInTargetDate.ToTime()
@@ -73,7 +73,7 @@ func CheckSignInScheduledWork() {
 		if len(notifyClients) > 0 {
 			for _, client := range notifyClients {
 				expiry := client.ExpiredAt.ToTime()
-				if expiry.IsZero() && client.SignInTargetDate != nil {
+				if client.ExpiredAt.IsEffectivelyZero() && client.SignInTargetDate != nil && !client.SignInTargetDate.IsEffectivelyZero() {
 					expiry = client.SignInTargetDate.ToTime()
 				}
 				daysLeft := int(expiry.Sub(now).Hours() / 24)
