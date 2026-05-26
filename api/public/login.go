@@ -17,6 +17,7 @@ type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	TwoFa    string `json:"2fa_code"`
+	Remember bool   `json:"remember"`
 }
 
 func Login(c *gin.Context) {
@@ -59,13 +60,20 @@ func Login(c *gin.Context) {
 			return
 		}
 	}
-	// Create session
+	// Create session (Server side session persists for 30 days)
 	session, err := accounts.CreateSession(uuid, 2592000, c.Request.UserAgent(), c.ClientIP(), "password")
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "Failed to create session: "+err.Error())
 		return
 	}
-	c.SetCookie("session_token", session, 2592000, "/", "", false, true)
+	
+	// Determine Cookie Max-Age
+	cookieMaxAge := 0
+	if data.Remember {
+		cookieMaxAge = 2592000
+	}
+	
+	c.SetCookie("session_token", session, cookieMaxAge, "/", "", false, true)
 	auditlog.Log(c.ClientIP(), uuid, "logged in (password)", "login")
 	api.RespondSuccess(c, gin.H{"set-cookie": gin.H{"session_token": session}})
 }
