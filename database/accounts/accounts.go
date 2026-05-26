@@ -5,11 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/utils"
 
 	"github.com/google/uuid"
 )
@@ -79,18 +79,29 @@ func DeleteAccountByUsername(username string) (err error) {
 	return nil
 }
 
-// 创建默认管理员账户，使用环境变量 ADMIN_USERNAME 作为用户名，环境变量 ADMIN_PASSWORD 作为密码
+// CreateDefaultAdminAccount creates the initial admin account.
+// Priority: USER_PWD (user:pass) > ADMIN_USERNAME + ADMIN_PASSWORD (legacy).
+// When DB is empty and no credentials are provided, returns an error (required).
 func CreateDefaultAdminAccount() (username, passwd string, err error) {
 	db := dbcore.GetDBInstance()
 
-	username = os.Getenv("ADMIN_USERNAME")
-	if username == "" {
-		username = "admin"
-	}
-
-	passwd = os.Getenv("ADMIN_PASSWORD")
-	if passwd == "" {
-		passwd = utils.GeneratePassword()
+	userPwd := os.Getenv("USER_PWD")
+	if userPwd != "" {
+		parts := strings.SplitN(userPwd, ":", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return "", "", fmt.Errorf("USER_PWD format invalid (expected user:pass), got: %s", userPwd)
+		}
+		username = parts[0]
+		passwd = parts[1]
+	} else {
+		username = os.Getenv("ADMIN_USERNAME")
+		if username == "" {
+			username = "admin"
+		}
+		passwd = os.Getenv("ADMIN_PASSWORD")
+		if passwd == "" {
+			return "", "", fmt.Errorf("neither USER_PWD nor ADMIN_PASSWORD is set — at least one is required when no admin exists in the database")
+		}
 	}
 
 	hashedPassword := hashPasswd(passwd)

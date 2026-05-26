@@ -388,11 +388,11 @@ func InitDatabase() {
 	// }
 	var count int64 = 0
 	if dbcore.GetDBInstance().Model(&models.User{}).Count(&count); count == 0 {
-		user, passwd, err := accounts.CreateDefaultAdminAccount()
+		user, _, err := accounts.CreateDefaultAdminAccount()
 		if err != nil {
 			panic(err)
 		}
-		log.Println("Default admin account created. Username:", user, ", Password:", passwd)
+		log.Printf("Default admin account created: %s (set via env var)", user)
 	}
 }
 
