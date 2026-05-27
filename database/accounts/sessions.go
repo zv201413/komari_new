@@ -50,8 +50,16 @@ func CreateSession(uuid string, expires int, userAgent, ip, login_method string)
 			}
 			messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Login,
+				Clients: []models.Client{
+					{
+						Name:    "Dashboard",
+						IPv4:    ip,
+						Region:  loc,
+						OS:      userAgent,
+					},
+				},
 				Time:    time.Now(),
-				Message: fmt.Sprintf("%s: %s (%s)\n%s", login_method, ip, loc, userAgent),
+				Message: fmt.Sprintf("Method: %s", login_method),
 				Emoji:   "🔑",
 			})
 		}
