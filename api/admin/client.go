@@ -56,6 +56,27 @@ func EditClient(c *gin.Context) {
 		}
 	}
 
+	// 流量校正：前端传入"真实已用流量"绝对值(字节)，换算为相对当前实测的偏移量后存储。
+	// 展示端会把偏移量加回实测值，因此校正后面板会从该真实值继续累加。
+	if _, hasU := req["set_traffic_used_up"]; hasU {
+		if _, hasD := req["set_traffic_used_down"]; hasD {
+			latestMap := ws.GetLatestReport()
+			var rawUp, rawDown int64
+			if rep := latestMap[uuid]; rep != nil {
+				rawUp = rep.Network.TotalUp
+				rawDown = rep.Network.TotalDown
+			}
+			if f, ok := req["set_traffic_used_up"].(float64); ok {
+				req["traffic_offset_up"] = int64(f) - rawUp
+			}
+			if f, ok := req["set_traffic_used_down"].(float64); ok {
+				req["traffic_offset_down"] = int64(f) - rawDown
+			}
+		}
+		delete(req, "set_traffic_used_up")
+		delete(req, "set_traffic_used_down")
+	}
+
 	err := clients.SaveClient(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})

@@ -45,6 +45,8 @@ type Client struct {
 	Hidden           bool      `json:"hidden" gorm:"default:false"`
 	TrafficLimit     int64     `json:"traffic_limit" gorm:"type:bigint"`
 	TrafficLimitType string    `json:"traffic_limit_type" gorm:"type:varchar(10);default:'max'"` // 流量阈值类型：sum max min up down
+	TrafficOffsetUp   int64    `json:"traffic_offset_up" gorm:"type:bigint;default:0"`   // 已用流量校正偏移(字节,上传)：展示值 = 实测 + 偏移
+	TrafficOffsetDown int64    `json:"traffic_offset_down" gorm:"type:bigint;default:0"` // 已用流量校正偏移(字节,下载)
 	CreatedAt        LocalTime `json:"created_at"`
 	UpdatedAt        LocalTime `json:"updated_at"`
 }

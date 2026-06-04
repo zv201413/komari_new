@@ -293,17 +293,26 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	}
 
 	// Hidden 过滤
+	// 加载客户端信息：隐藏过滤 + 流量校正偏移(对所有访问者生效)
+	cinfo, cerr := clients.GetAllClientBasicInfo()
+	if cerr != nil && meta.Permission != "admin" {
+		return nil, rpc.MakeError(rpc.InternalError, "Failed to get client info", cerr.Error())
+	}
+	offUp := make(map[string]int64, len(cinfo))
+	offDown := make(map[string]int64, len(cinfo))
+	hidden := make(map[string]bool, len(cinfo))
+	for _, c := range cinfo {
+		if c.TrafficOffsetUp != 0 {
+			offUp[c.UUID] = c.TrafficOffsetUp
+		}
+		if c.TrafficOffsetDown != 0 {
+			offDown[c.UUID] = c.TrafficOffsetDown
+		}
+		if c.Hidden {
+			hidden[c.UUID] = true
+		}
+	}
 	if meta.Permission != "admin" {
-		cinfo, err := clients.GetAllClientBasicInfo()
-		if err != nil {
-			return nil, rpc.MakeError(rpc.InternalError, "Failed to get client info", err.Error())
-		}
-		hidden := make(map[string]bool, len(cinfo))
-		for _, c := range cinfo {
-			if c.Hidden {
-				hidden[c.UUID] = true
-			}
-		}
 		for uuid := range latest {
 			if hidden[uuid] {
 				delete(latest, uuid)
@@ -372,8 +381,8 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			DiskTotal:      rep.Disk.Total,
 			NetIn:          rep.Network.Down,
 			NetOut:         rep.Network.Up,
-			NetTotalUp:     rep.Network.TotalUp,
-			NetTotalDown:   rep.Network.TotalDown,
+			NetTotalUp:     rep.Network.TotalUp + offUp[uuid],
+			NetTotalDown:   rep.Network.TotalDown + offDown[uuid],
 			Process:        rep.Process,
 			Connections:    rep.Connections.TCP + rep.Connections.UDP,
 			ConnectionsUdp: rep.Connections.UDP,
@@ -490,6 +499,16 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 	raw, _ := api.Records.Get(params.UUID)
 	reports, _ := raw.([]common.Report)
 
+	// 流量校正偏移(单节点)：历史曲线整体抬升保持与面板一致
+	var trafficOffUp, trafficOffDown int64
+	{
+		var cli models.Client
+		if err := dbcore.GetDBInstance().Select("traffic_offset_up", "traffic_offset_down").Where("uuid = ?", params.UUID).First(&cli).Error; err == nil {
+			trafficOffUp = cli.TrafficOffsetUp
+			trafficOffDown = cli.TrafficOffsetDown
+		}
+	}
+
 	// 扁平化为 { count, records: [] }
 	type flatRecord struct {
 		Client         string           `json:"client"`
@@ -542,8 +561,8 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 			DiskTotal:      r.Disk.Total,
 			NetIn:          r.Network.Down,
 			NetOut:         r.Network.Up,
-			NetTotalUp:     r.Network.TotalUp,
-			NetTotalDown:   r.Network.TotalDown,
+			NetTotalUp:     r.Network.TotalUp + trafficOffUp,
+			NetTotalDown:   r.Network.TotalDown + trafficOffDown,
 			Process:        r.Process,
 			Connections:    r.Connections.TCP + r.Connections.UDP,
 			ConnectionsUdp: r.Connections.UDP,
