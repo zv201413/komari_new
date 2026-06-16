@@ -131,6 +131,13 @@ func RunServer() {
 	}
 
 	r := gin.New()
+	// 反代信任配置：komari 跑在同 pod nginx 后面（nginx.conf: proxy_pass 127.0.0.1:25774）。
+	// gin 默认信任所有代理且取 X-Forwarded-For 最左条目（客户端可伪造）→ 登录限速会被绕过。
+	// 因此只信任同 pod nginx，并改用 nginx 覆盖写入的 X-Real-IP（不可追加、不可伪造）。
+	if err := r.SetTrustedProxies([]string{"127.0.0.1", "::1"}); err != nil {
+		log.Printf("failed to set trusted proxies: %v", err)
+	}
+	r.RemoteIPHeaders = []string{"X-Real-IP"}
 	r.Use(logutil.GinLogger())
 	r.Use(logutil.GinRecovery())
 

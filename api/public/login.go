@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/komari-monitor/komari/utils/loginlimiter"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,8 +45,19 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 登录失败限速：组合键 IP|用户名，锁定期内直接拒绝。
+	clientIP := c.ClientIP()
+	limiterKey := loginlimiter.Key(clientIP, data.Username)
+	if blocked, retryAfter := loginlimiter.Default.Allow(limiterKey); blocked {
+		auditlog.Log(clientIP, "", "login blocked (rate limit)", "login")
+		c.Header("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+		api.RespondError(c, http.StatusTooManyRequests, "Too many failed login attempts. Please try again later.")
+		return
+	}
+
 	uuid, success := accounts.CheckPassword(data.Username, data.Password)
 	if !success {
+		loginlimiter.Default.Fail(limiterKey)
 		api.RespondError(c, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
@@ -56,12 +69,15 @@ func Login(c *gin.Context) {
 			return
 		}
 		if ok, err := accounts.Verify2Fa(uuid, data.TwoFa); err != nil || !ok {
+			loginlimiter.Default.Fail(limiterKey)
 			api.RespondError(c, http.StatusUnauthorized, "Invalid 2FA code")
 			return
 		}
 	}
+	// 登录成功，清除失败计数。
+	loginlimiter.Default.Reset(limiterKey)
 	// Create session (Server side session persists for 30 days)
-	session, err := accounts.CreateSession(uuid, 2592000, c.Request.UserAgent(), c.ClientIP(), "password")
+	session, err := accounts.CreateSession(uuid, 2592000, c.Request.UserAgent(), clientIP, "password")
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "Failed to create session: "+err.Error())
 		return
