@@ -65,6 +65,7 @@ func SudoAuth(c *gin.Context) {
 // SudoCheck HTTP 预检：前端建立终端 WS 前先确认 Sudo Token 有效。
 // GET /api/admin/sudo-check
 func SudoCheck(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	sudo2FARequired, _ := config.GetAs[bool](config.Sudo2FaRequiredKey, false)
 	if !sudo2FARequired {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
