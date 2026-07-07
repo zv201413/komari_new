@@ -53,7 +53,6 @@ func EditSettings(c *gin.Context) {
 		return
 	}
 
-	uuid, _ := c.Get("uuid")
 	message := "update settings: "
 	for key := range cfg {
 		message += key + ", "
