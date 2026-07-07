@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/sudotoken"
@@ -36,23 +37,26 @@ func RequestTerminal(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	// 验证 Sudo Token：管理员必须通过 2FA 验证才能打开终端。
-	sudoCookie, err := c.Request.Cookie("sudo_token")
-	if err != nil || sudoCookie.Value == "" {
-		conn.WriteMessage(1, []byte("Sudo token required. Please verify 2FA first.\n需要 2FA 验证。\n"))
-		conn.Close()
-		return
-	}
-	tokenUUID, ok := sudotoken.Default.Validate(sudoCookie.Value)
-	if !ok {
-		conn.WriteMessage(1, []byte("Sudo token expired. Please re-verify 2FA.\nSudo Token 已过期，请重新验证。\n"))
-		conn.Close()
-		return
-	}
-	if tokenUUID != user_uuid.(string) {
-		conn.WriteMessage(1, []byte("Sudo token UUID mismatch.\n"))
-		conn.Close()
-		return
+	// 验证 Sudo Token：仅在启用 2FA 时强制管理员验证。
+	sudo2FARequired, _ := config.GetAs[bool](config.Sudo2FaRequiredKey, false)
+	if sudo2FARequired {
+		sudoCookie, err := c.Request.Cookie("sudo_token")
+		if err != nil || sudoCookie.Value == "" {
+			conn.WriteMessage(1, []byte("Sudo token required. Please verify 2FA first.\n需要 2FA 验证。\n"))
+			conn.Close()
+			return
+		}
+		tokenUUID, ok := sudotoken.Default.Validate(sudoCookie.Value)
+		if !ok {
+			conn.WriteMessage(1, []byte("Sudo token expired. Please re-verify 2FA.\nSudo Token 已过期，请重新验证。\n"))
+			conn.Close()
+			return
+		}
+		if tokenUUID != user_uuid.(string) {
+			conn.WriteMessage(1, []byte("Sudo token UUID mismatch.\n"))
+			conn.Close()
+			return
+		}
 	}
 
 	// 新建一个终端连接

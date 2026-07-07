@@ -37,8 +37,10 @@ type Legacy struct {
 	ExpireNotificationLeadDays int     `json:"expire_notification_lead_days" default:"7"`  // 过期前多少天通知，默认7天
 	LoginNotification          bool    `json:"login_notification" default:"true"`          // 登录通知
 	TrafficLimitPercentage     float64 `json:"traffic_limit_percentage" default:"80.00"`   // 流量限制百分比，默认80.00%
+	// Terminal 2FA sudo token
+	Sudo2FaRequired bool `json:"sudo_2fa_required" default:"false"` // 终端是否需要 2FA sudo token
 	// Record
-	RecordEnabled          bool `json:"record_enabled" default:"true"`          // 是否启用记录功能
+	RecordEnabled bool `json:"record_enabled" default:"true"` // 是否启用记录功能
 	RecordPreserveTime     int  `json:"record_preserve_time" default:"720"`     // 记录保留时间，单位小时，默认30天
 	PingRecordPreserveTime int  `json:"ping_record_preserve_time" default:"24"` // Ping 记录保留时间，单位小时，默认1天
 	UpdatedAt              time.Time
@@ -73,6 +75,7 @@ const (
 	ExpireNotificationLeadDaysKey = "expire_notification_lead_days"
 	LoginNotificationKey          = "login_notification"
 	TrafficLimitPercentageKey     = "traffic_limit_percentage"
+	Sudo2FaRequiredKey            = "sudo_2fa_required"
 	RecordEnabledKey              = "record_enabled"
 	RecordPreserveTimeKey         = "record_preserve_time"
 	PingRecordPreserveTimeKey     = "ping_record_preserve_time"

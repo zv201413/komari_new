@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/api"
+	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/utils/sudotoken"
 )
@@ -64,6 +65,11 @@ func SudoAuth(c *gin.Context) {
 // SudoCheck HTTP 预检：前端建立终端 WS 前先确认 Sudo Token 有效。
 // GET /api/admin/sudo-check
 func SudoCheck(c *gin.Context) {
+	sudo2FARequired, _ := config.GetAs[bool](config.Sudo2FaRequiredKey, false)
+	if !sudo2FARequired {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
 	token, err := c.Cookie("sudo_token")
 	if err != nil || token == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "sudo token required"})
