@@ -286,6 +286,10 @@ func RunServer() {
 			clientGroup.GET("/:uuid/terminal", terminal.RequestTerminal)
 		}
 
+		// sudo (2FA 终端二次验证)
+		adminAuthrized.POST("/sudo-auth", admin.SudoAuth)
+		adminAuthrized.GET("/sudo-check", admin.SudoCheck)
+
 		// records
 		recordGroup := adminAuthrized.Group("/record")
 		{
