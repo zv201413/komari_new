@@ -3,11 +3,10 @@ package admin
 import (
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
+	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/records"
 	"github.com/komari-monitor/komari/database/tasks"
-	"github.com/komari-monitor/komari/database/users"
-	"github.com/pquerna/otp/totp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,8 +39,8 @@ func EditSettings(c *gin.Context) {
 					api.RespondError(c, 401, "2fa_code_required")
 					return
 				}
-				user, err := users.GetByUUID(uuid.(string))
-				if err != nil || !user.TwoFAEnabled || !totp.Validate(code, user.TwoFASecret) {
+				ok, err := accounts.Verify2Fa(uuid.(string), code)
+				if err != nil || !ok {
 					api.RespondError(c, 401, "invalid_code")
 					return
 				}
