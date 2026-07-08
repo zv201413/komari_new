@@ -58,7 +58,15 @@ func SudoAuth(c *gin.Context) {
 	token := sudotoken.Default.Create(uuidStr, duration)
 	maxAge := int(duration.Seconds())
 
-	c.SetCookie("sudo_token", token, maxAge, "/", "", false, true)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "sudo_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		Secure:   utils.GetScheme(c) == "https",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 	api.RespondSuccess(c, gin.H{"granted": true})
 }
 

@@ -2,6 +2,7 @@ package dbcore
 
 import (
 	"archive/zip"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,24 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+func buildSQLiteDSN(databaseFile string) string {
+	if databaseFile == "" {
+		databaseFile = "./data/komari.db"
+	}
+	params := "_busy_timeout=5000&_txlock=immediate&_journal_mode=WAL&_synchronous=NORMAL"
+	separator := "?"
+	if strings.Contains(databaseFile, "?") {
+		separator = "&"
+	}
+	if strings.HasPrefix(databaseFile, "file:") {
+		return databaseFile + separator + params
+	}
+	if databaseFile == ":memory:" {
+		return "file::memory:?cache=shared&" + params
+	}
+	return "file:" + filepath.ToSlash(databaseFile) + separator + params
+}
 
 // zipDirectoryExcluding 将 srcDir 打包为 dstZip，exclude 是绝对路径集合需要排除
 func zipDirectoryExcluding(srcDir, dstZip string, exclude map[string]struct{}) error {
@@ -415,11 +434,17 @@ func GetDBInstance() *gorm.DB {
 		switch flags.DatabaseType {
 		case "sqlite", "":
 			// SQLite 连接
-			instance, err = gorm.Open(sqlite.Open(flags.DatabaseFile), logConfig)
+			dsn := buildSQLiteDSN(flags.DatabaseFile)
+			instance, err = gorm.Open(sqlite.Open(dsn), logConfig)
 			if err != nil {
 				log.Fatalf("Failed to connect to SQLite3 database: %v", err)
 			}
 			log.Printf("Using SQLite database file: %s", flags.DatabaseFile)
+
+			sqlDB, _ := instance.DB()
+			if sqlDB != nil {
+				sqlDB.SetMaxOpenConns(1)
+			}
 			instance.Exec("PRAGMA wal = ON;")
 			if err := instance.Exec("PRAGMA journal_mode = WAL;").Error; err != nil {
 				log.Printf("Failed to enable WAL mode for SQLite: %v", err)

@@ -2,6 +2,7 @@ package public
 
 import (
 	"fmt"
+	"net/http"
 	"slices"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func OAuth(c *gin.Context) {
 
 	authURL, state := oauth.CurrentProvider().GetAuthorizationURL(utils.GetCallbackURL(c))
 
-	c.SetCookie("oauth_state", state, 3600, "/", "", false, true)
+	http.SetCookie(c.Writer, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 3600, Secure: utils.GetScheme(c) == "https", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 
 	c.Redirect(302, authURL)
 }
@@ -32,7 +33,7 @@ func OAuthCallback(c *gin.Context) {
 
 	// 验证state防止CSRF攻击
 	state, _ := c.Cookie("oauth_state")
-	c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+	http.SetCookie(c.Writer, &http.Cookie{Name: "oauth_state", Value: "", Path: "/", MaxAge: -1, Secure: utils.GetScheme(c) == "https", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 
 	// 获取当前OAuth提供商名称
 	providerName := oauth.CurrentProvider().GetName()
@@ -71,7 +72,7 @@ func OAuthCallback(c *gin.Context) {
 	// 如果cookie中有binding_external_account，说明是绑定外部账号
 	// 否则是登录
 	uuid, _ := c.Cookie("binding_external_account")
-	c.SetCookie("binding_external_account", "", -1, "/", "", false, true)
+	http.SetCookie(c.Writer, &http.Cookie{Name: "binding_external_account", Value: "", Path: "/", MaxAge: -1, Secure: utils.GetScheme(c) == "https", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	if uuid != "" {
 		// 绑定外部账号
 		session, _ := c.Cookie("session_token")
@@ -108,7 +109,15 @@ func OAuthCallback(c *gin.Context) {
 	}
 
 	// 设置cookie并返回
-	c.SetCookie("session_token", session, 2592000, "/", "", false, true)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "session_token",
+		Value:    session,
+		Path:     "/",
+		MaxAge:   2592000,
+		Secure:   utils.GetScheme(c) == "https",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 	auditlog.Log(c.ClientIP(), user.UUID, "logged in (OAuth)", "login")
 	c.Redirect(302, "/admin")
 }

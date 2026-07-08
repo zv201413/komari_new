@@ -1,6 +1,10 @@
 package utils
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 // https://github.com/labstack/echo/blob/98ca08e7dd64075b858e758d6693bf9799340756/context.go#L275-L294
 func GetScheme(c *gin.Context) string {
@@ -28,4 +32,16 @@ func GetCallbackURL(c *gin.Context) string {
 	scheme := GetScheme(c)
 	host := c.Request.Host
 	return scheme + "://" + host + "/api/oauth_callback"
+}
+
+func SetSecureCookie(c *gin.Context, name, value string, maxAge int) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		MaxAge:   maxAge,
+		Secure:   GetScheme(c) == "https",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

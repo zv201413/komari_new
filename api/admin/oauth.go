@@ -1,12 +1,15 @@
 package admin
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database"
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/oauth"
 	"github.com/komari-monitor/komari/utils/oauth/factory"
 )
@@ -19,7 +22,7 @@ func BindingExternalAccount(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("binding_external_account", user.UUID, 3600, "/", "", false, true)
+	utils.SetSecureCookie(c, "binding_external_account", user.UUID, 3600)
 	c.Redirect(302, "/api/oauth")
 }
 func UnbindExternalAccount(c *gin.Context) {

@@ -10,6 +10,7 @@ import (
 	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/loginlimiter"
 
 	"github.com/gin-gonic/gin"
@@ -88,15 +89,23 @@ func Login(c *gin.Context) {
 	if data.Remember {
 		cookieMaxAge = 2592000
 	}
-	
-	c.SetCookie("session_token", session, cookieMaxAge, "/", "", false, true)
+
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "session_token",
+		Value:    session,
+		Path:     "/",
+		MaxAge:   cookieMaxAge,
+		Secure:   utils.GetScheme(c) == "https",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 	auditlog.Log(c.ClientIP(), uuid, "logged in (password)", "login")
 	api.RespondSuccess(c, gin.H{"set-cookie": gin.H{"session_token": session}})
 }
 func Logout(c *gin.Context) {
 	session, _ := c.Cookie("session_token")
 	accounts.DeleteSession(session)
-	c.SetCookie("session_token", "", -1, "/", "", false, true)
+	utils.SetSecureCookie(c, "session_token", "", -1)
 	auditlog.Log(c.ClientIP(), "", "logged out", "logout")
 	c.Redirect(302, "/")
 }
