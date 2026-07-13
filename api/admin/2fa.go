@@ -2,7 +2,6 @@ package admin
 
 import (
 	"image/png"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/api"

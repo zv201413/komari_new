@@ -8,6 +8,7 @@ import (
 	"github.com/komari-monitor/komari/api"
 	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/accounts"
+	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/sudotoken"
 )
 
