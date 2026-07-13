@@ -30,12 +30,14 @@ func ClientSignIn(c *gin.Context) {
 	}
 
 	now := time.Now()
-	var newExpiredAt time.Time
-
+	// Sign-in extends expired_at by interval_days from now.
+	// If a target date is set and falls BEFORE now+interval, cap at the target.
+	newExpiredAt := now.AddDate(0, 0, client.SignInIntervalDays)
 	if client.SignInTargetDate != nil && !client.SignInTargetDate.ToTime().IsZero() {
-		newExpiredAt = client.SignInTargetDate.ToTime()
-	} else {
-		newExpiredAt = now.AddDate(0, 0, client.SignInIntervalDays)
+		targetDate := client.SignInTargetDate.ToTime()
+		if targetDate.Before(newExpiredAt) {
+			newExpiredAt = targetDate
+		}
 	}
 
 	updates := map[string]interface{}{
