@@ -2,7 +2,6 @@ package dbcore
 
 import (
 	"archive/zip"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
