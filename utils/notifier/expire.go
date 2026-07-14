@@ -52,6 +52,12 @@ func CheckExpireScheduledWork() {
 			var clientLeadToExpire []clientToExpireInfo
 
 			for _, client := range clients_all {
+				// 签到节点由签到提醒（sign_in.go）单独负责，其 expired_at 是签到截止日，
+				// 不应再触发通用「到期提醒」，否则刚签到完仍会被提醒。
+				if client.RequireSignIn {
+					continue
+				}
+
 				clientExpireTime := client.ExpiredAt.ToTime()
 
 				if clientExpireTime.Before(checkTime) {
