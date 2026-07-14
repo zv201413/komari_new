@@ -30,15 +30,10 @@ func ClientSignIn(c *gin.Context) {
 	}
 
 	now := time.Now()
-	// Sign-in extends expired_at by interval_days from now.
-	// If a target date is set and falls BEFORE now+interval, cap at the target.
+	// 快捷签到 = 按签到周期天数顺延，从当前时间起算。
+	// 不受 sign_in_target_date 影响：该字段属于「签到至指定日期」模式，
+	// 若切回「按天数顺延」后仍有残留值，也不能封顶快捷签到的顺延结果。
 	newExpiredAt := now.AddDate(0, 0, client.SignInIntervalDays)
-	if client.SignInTargetDate != nil && !client.SignInTargetDate.ToTime().IsZero() {
-		targetDate := client.SignInTargetDate.ToTime()
-		if targetDate.Before(newExpiredAt) {
-			newExpiredAt = targetDate
-		}
-	}
 
 	updates := map[string]interface{}{
 		"expired_at":            models.FromTime(newExpiredAt),
