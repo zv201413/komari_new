@@ -1,16 +1,28 @@
-name: Build Binaries on Main Push and PR
+name: Build Binaries on PR
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
 jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build frontend artifact
+        uses: ./.github/actions/build-frontend
+        with:
+          artifact-name: komari-frontend
+          repository: https://github.com/zv201413/komari-web_new.git
+          ref: radix
+
   build-binaries:
+    needs: build-frontend
     runs-on: ubuntu-latest
 
     strategy:
@@ -49,6 +61,10 @@ jobs:
             goarch: riscv64
             zig_target_triple: riscv64-linux-musl
             binary_extension: ""
+          - goos: linux
+            goarch: loong64
+            zig_target_triple: loongarch64-linux-musl
+            binary_extension: ""
 
         exclude:
           - goos: windows
@@ -58,27 +74,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "23"
-
-      - name: Clone and build frontend
-        run: |
-          git clone -b radix https://github.com/zv201413/komari-web_new.git web
-          cd web
-          npm install
-          npm run build
-          cd ..
-          mkdir -p public/defaultTheme/dist
-          rm -rf public/defaultTheme/dist/*
-          cp -r web/dist/* public/defaultTheme/dist/
-          cp -f web/komari-theme.json public/defaultTheme/
-          if [ -f web/preview.png ]; then cp -f web/preview.png public/defaultTheme/; fi
-          if [ -f web/perview.png ]; then cp -f web/perview.png public/defaultTheme/; fi
-          # Compatibility: ensure both filenames exist if only one is present
-          if [ -f public/defaultTheme/preview.png ] && [ ! -f public/defaultTheme/perview.png ]; then cp -f public/defaultTheme/preview.png public/defaultTheme/perview.png; fi
-          if [ -f public/defaultTheme/perview.png ] && [ ! -f public/defaultTheme/preview.png ]; then cp -f public/defaultTheme/perview.png public/defaultTheme/preview.png; fi
+      - name: Restore frontend artifact
+        uses: ./.github/actions/restore-frontend
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -86,12 +83,7 @@ jobs:
           go-version: "1.23"
 
       - name: Install Zig cross-compiler toolchain
-        run: |
-          sudo apt-get update # Update apt package lists
-          sudo apt-get install -y build-essential curl
-          wget https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz
-          sudo tar -C /usr/local -Jxf zig-x86_64-linux-0.14.1.tar.xz
-          echo "PATH=$PATH:/usr/local/zig-x86_64-linux-0.14.1" >> $GITHUB_ENV
+        uses: ./.github/actions/setup-zig
 
       - name: Build binary
         env:

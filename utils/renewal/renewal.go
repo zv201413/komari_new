@@ -8,8 +8,9 @@ import (
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
+	"github.com/komari-monitor/komari/pkg/timeutil"
 	"github.com/komari-monitor/komari/utils/messageSender"
-	"github.com/komari-monitor/komari/ws"
+	agent_runtime "github.com/komari-monitor/komari/web/agent"
 )
 
 func CheckAndAutoRenewal(client models.Client) {
@@ -24,12 +25,15 @@ func CheckAndAutoRenewal(client models.Client) {
 		return
 	}
 	// 不在线则不续费
-	if _, ok := ws.GetConnectedClients()[client.UUID]; !ok {
+	if _, ok := agent_runtime.GetConnectedClients()[client.UUID]; !ok {
+		return
+	}
+	if client.ExpiredAt == nil {
 		return
 	}
 
-	clientExpireTime := client.ExpiredAt.ToTime()
-	checkTime := time.Now()
+	clientExpireTime := client.ExpiredAt.UTC()
+	checkTime := time.Now().UTC()
 
 	// 如果到期时间小于0002年，跳过
 	if clientExpireTime.Year() < 2 {
@@ -37,10 +41,11 @@ func CheckAndAutoRenewal(client models.Client) {
 	}
 
 	// 检查是否已过期或当天过期
-	if clientExpireTime.Before(checkTime) || clientExpireTime.Format("2006-01-02") == checkTime.Format("2006-01-02") {
+	if clientExpireTime.Before(checkTime) || timeutil.SameSystemDate(clientExpireTime, checkTime) {
 		// 计算过期时间距离创建时间的总天数，判断是否为长期账单
-		now := time.Now()
-		hundredYearsFromNow := now.AddDate(100, 0, 0)
+		now := checkTime
+		localNow := now.In(time.Local)
+		hundredYearsFromNow := localNow.AddDate(100, 0, 0).UTC()
 
 		// 如果过期时间超过当前时间100年，视为长期/一次性账单，不续费
 		if clientExpireTime.After(hundredYearsFromNow) {
@@ -54,9 +59,9 @@ func CheckAndAutoRenewal(client models.Client) {
 			billingCycle := client.BillingCycle
 
 			// 如果服务器的过期时间太早了，那么直接设置为从当前时间算的下一个到期时间
-			baseTime := clientExpireTime
-			if clientExpireTime.Before(now.AddDate(0, 0, -30)) { // 过期时间超过30天前
-				baseTime = now
+			baseTime := clientExpireTime.In(time.Local)
+			if clientExpireTime.Before(localNow.AddDate(0, 0, -30).UTC()) { // 过期时间超过30天前
+				baseTime = localNow
 			}
 
 			if billingCycle >= 27 && billingCycle <= 32 {
@@ -88,7 +93,7 @@ func CheckAndAutoRenewal(client models.Client) {
 			// 更新客户端过期时间
 			updates := map[string]interface{}{
 				"uuid":       client.UUID,
-				"expired_at": models.FromTime(newExpireTime),
+				"expired_at": newExpireTime.UTC(),
 			}
 
 			err := clients.SaveClient(updates)
@@ -103,14 +108,14 @@ func CheckAndAutoRenewal(client models.Client) {
 			//})
 
 			auditlog.EventLog("renewal", fmt.Sprintf("Auto-renewed client: %s until %s",
-				client.Name, newExpireTime.Format("2006-01-02")))
+				client.Name, timeutil.FormatSystemDate(newExpireTime)))
 
 			messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Renew,
 				Clients: []models.Client{client},
-				Time:    time.Now(),
+				Time:    time.Now().UTC(),
 				Emoji:   "🔄",
-				Message: fmt.Sprintf("• %s until %s\n", client.Name, newExpireTime.Format("2006-01-02")),
+				Message: fmt.Sprintf("• %s until %s\n", client.Name, timeutil.FormatSystemDate(newExpireTime)),
 			})
 		}
 	}
@@ -133,8 +138,10 @@ func CheckAndAutoRenewal(client models.Client) {
 
 // addMonthsClamped 在 t 上增加 months 个自然月，并把"日"夹到目标月的实际最后一天，
 // 规避 Go AddDate 的月末进位问题：
-//   1/31 + 1月 用 AddDate 会变成 3/3(闰年 3/2)，这里夹回 2/28(闰年 2/29)；
-//   3/31 + 1月 → 4/30；2/29 + 12月 → 2/28。
+//
+//	1/31 + 1月 用 AddDate 会变成 3/3(闰年 3/2)，这里夹回 2/28(闰年 2/29)；
+//	3/31 + 1月 → 4/30；2/29 + 12月 → 2/28。
+//
 // 其余日期(如 19 号)行为不变。months 恒为正(1/3/6/12/24/36/60)。
 func addMonthsClamped(t time.Time, months int) time.Time {
 	y, m, d := t.Date()

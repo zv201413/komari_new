@@ -6,6 +6,11 @@
 
 Komariは、サーバーのパフォーマンスを監視するためのシンプルで効率的なソリューションを提供することを目的とした、軽量の自己ホスト型サーバー監視ツールです。Webインターフェースを介してサーバーのステータスを表示し、軽量エージェントを介してデータを収集します。
 
+> [!WARNING]
+> Komariは、自己ホスト型の監視/制御プログラムであり、所有しているシステム、または管理権限を得ているシステムでのみ使用してください。Komariを武器化したり、許可なく展開、アクセス、永続化、コマンド実行、その他の不正利用に使用したりしないでください。実際の悪用リスクについては、Huntressの分析をご参照ください：[Komari C2 agent abuse](https://www.huntress.com/blog/komari-c2-agent-abuse)。
+> Komariの展開および運用方法については、利用者自身が責任を負います。開発者は、無許可または不正な利用、およびその結果について責任を負いません。
+> Windows端末でリモートコントロールを有効にした場合、クライアントはユーザーがログインするたびに、KomariがリモートコントロールソフトウェアであることをWindows通知で知らせます。
+
 [ドキュメント](https://komari-document.pages.dev/) | [Telegramグループ](https://t.me/komari_monitor)
 
 ## 特徴
@@ -50,14 +55,7 @@ sudo ./install-komari.sh
      --name komari \
      ghcr.io/komari-monitor/komari:latest
    ```
-3. デフォルトのユーザー名とパスワードを表示します:
-   ```bash
-   docker logs komari
-   ```
-4. ブラウザで `http://<your_server_ip>:25774` にアクセスします。
-
-> [!NOTE]
-> 環境変数 `ADMIN_USERNAME` と `ADMIN_PASSWORD` を使用して、初期のユーザー名とパスワードをカスタマイズすることもできます。
+3. ブラウザで `http://<your_server_ip>:25774` にアクセスし、インストールガイドを完了します。ガイドで管理者アカウント、サイト情報、監視データベースを設定します。
 
 ### 3. バイナリファイル展開
 
@@ -67,7 +65,7 @@ sudo ./install-komari.sh
    ./komari server -l 0.0.0.0:25774
    ```
 3. ブラウザで `http://<your_server_ip>:25774` にアクセスします。デフォルトのポートは `25774` です。
-4. デフォルトのユーザー名とパスワードは、起動ログで確認するか、環境変数 `ADMIN_USERNAME` と `ADMIN_PASSWORD` を介して設定できます。
+4. インストールガイドに従って管理者アカウント、サイト情報、監視データベースを設定します。
 
 > [!NOTE]
 > バイナリに実行権限があることを確認してください（`chmod +x komari`）。データは実行ディレクトリの `data` フォルダに保存されます。
@@ -90,7 +88,7 @@ sudo ./install-komari.sh
    git clone https://github.com/komari-monitor/komari
    cd komari
    ```
-   ステップ1で生成された静的ファイルを `komari` プロジェクトのルートにある `/public/defaultTheme/dist` フォルダにコピーし、`komari-theme.json` と `preview.png`/`perview.png` を `/public/defaultTheme` にコピーします。
+   ステップ1で生成された静的ファイルを `komari` プロジェクトのルートにある `/web/public/defaultTheme/dist` フォルダにコピーし、`komari-theme.json` と `preview.png`/`perview.png` を `/web/public/defaultTheme` にコピーします。
    ```bash
    go build -o komari
    ```

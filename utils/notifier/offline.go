@@ -2,15 +2,15 @@ package notifier
 
 import (
 	"fmt"
-	"log"
+	logger "github.com/komari-monitor/komari/utils/log"
 	"sync"
 	"time"
 
-	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
+	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils/messageSender"
 	"github.com/komari-monitor/komari/utils/renewal"
 )
@@ -40,7 +40,7 @@ func getNotificationConfig(clientID string) (*models.OfflineNotification, bool) 
 	notiConf := models.OfflineNotification{Client: clientID}
 	db := dbcore.GetDBInstance()
 	if err := db.Model(&models.OfflineNotification{}).Where("client = ?", clientID).FirstOrCreate(&notiConf).Error; err != nil {
-		log.Printf("Failed to get or create offline notification config for client %s: %v", clientID, err)
+		logger.Errorf("notifier", "Failed to get or create offline notification config for client %s: %v", clientID, err)
 		return nil, false
 	}
 
@@ -71,9 +71,9 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 		gracePeriod = 5 * time.Minute // 默认宽限期
 	}
 
-	log.Printf("[diagnostic] OfflineNotification for %s: DB grace_period=%d, effective gracePeriod=%v", clientID, notiConf.GracePeriod, gracePeriod)
+	logger.Infof("notifier", "[diagnostic] OfflineNotification for %s: DB grace_period=%d, effective gracePeriod=%v", clientID, notiConf.GracePeriod, gracePeriod)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	state := getOrInitState(clientID)
 
 	state.mu.Lock()
@@ -98,7 +98,7 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 		// 若为零值，说明客户端已重连。
 		// 当前的 connectionID 是否还是我们触发离线时的那个ID。如果不是，说明客户端重连过，本次离线通知已失效。
 		if state.pendingOfflineSince.IsZero() || state.connectionID != expectedConnectionID {
-			log.Printf("%s is reconnected new connID: %d, old connID: %d", clientID, state.connectionID, expectedConnectionID)
+			logger.Infof("notifier", "%s is reconnected new connID: %d, old connID: %d", clientID, state.connectionID, expectedConnectionID)
 			return
 		}
 
@@ -117,14 +117,14 @@ func OfflineNotification(clientID string, endedConnectionID int64) {
 				Message: msg,
 				Emoji:   "🔴",
 			}); err != nil {
-				log.Println("Failed to send offline notification:", err)
+				logger.ErrorArgs("notifier", "Failed to send offline notification:", err)
 			}
 		}(message)
 
 		// 更新数据库中的最后通知时间
 		db := dbcore.GetDBInstance()
-		if err := db.Model(&models.OfflineNotification{}).Where("client = ?", clientID).Update("last_notified", now).Error; err != nil {
-			log.Printf("Failed to update last_notified for client %s: %v", clientID, err)
+		if err := db.Model(&models.OfflineNotification{}).Where("client = ?", clientID).Update("last_notified", now.UTC()).Error; err != nil {
+			logger.Errorf("notifier", "Failed to update last_notified for client %s: %v", clientID, err)
 		}
 	}(now, endedConnectionID)
 }
@@ -159,11 +159,11 @@ func OnlineNotification(clientID string, connectionID int64) {
 			if err := messageSender.SendEvent(models.EventMessage{
 				Event:   messageevent.Registered,
 				Clients: []models.Client{client},
-				Time:    time.Now(),
+				Time:    time.Now().UTC(),
 				Message: message,
 				Emoji:   "🆕",
 			}); err != nil {
-				log.Println("Failed to send registered notification:", err)
+				logger.ErrorArgs("notifier", "Failed to send registered notification:", err)
 			}
 		}()
 		return
@@ -189,7 +189,7 @@ func OnlineNotification(clientID string, connectionID int64) {
 
 	// 规则3: 没断开后重连, 不通知
 	if state.isConnExist {
-		log.Printf("%s has connection exist: %d", clientID, connectionID)
+		logger.Infof("notifier", "%s has connection exist: %d", clientID, connectionID)
 		state.mu.Unlock()
 		// 即使不通知，我们依然在后台执行续费检查
 		go func() {
@@ -220,11 +220,11 @@ func OnlineNotification(clientID string, connectionID int64) {
 		if err := messageSender.SendEvent(models.EventMessage{
 			Event:   messageevent.Online,
 			Clients: []models.Client{client},
-			Time:    time.Now(),
+			Time:    time.Now().UTC(),
 			Message: message,
 			Emoji:   "🟢",
 		}); err != nil {
-			log.Println("Failed to send online notification:", err)
+			logger.ErrorArgs("notifier", "Failed to send online notification:", err)
 		}
 	}()
 }

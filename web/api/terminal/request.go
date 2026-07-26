@@ -1,0 +1,118 @@
+package terminal
+
+import (
+	logger "github.com/komari-monitor/komari/utils/log"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/komari-monitor/komari/database/clients"
+	"github.com/komari-monitor/komari/internal/config"
+	"github.com/komari-monitor/komari/utils"
+	"github.com/komari-monitor/komari/utils/sudotoken"
+	agent_runtime "github.com/komari-monitor/komari/web/agent"
+	"github.com/komari-monitor/komari/web/api"
+)
+
+func RequestTerminal(c *gin.Context) {
+	uuid := c.Param("uuid")
+	user_uuid, _ := c.Get("uuid")
+	_, err := clients.GetClientByUUID(uuid)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"status":  "error",
+			"message": "Client not found",
+		})
+		return
+	}
+	// 建立ws
+	if !api.IsWebSocketUpgrade(c) {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Require WebSocket upgrade"})
+		return
+	}
+	conn, err := api.UpgradeWebSocket(c)
+	if err != nil {
+		return
+	}
+	// 验证 Sudo Token：仅在启用 2FA 时强制管理员验证。
+	sudo2FARequired, _ := config.GetAs[bool](config.Sudo2FaRequiredKey, false)
+	if sudo2FARequired {
+		sudoCookie, err := c.Request.Cookie("sudo_token")
+		if err != nil || sudoCookie.Value == "" {
+			conn.WriteMessage(1, []byte("Sudo token required. Please verify 2FA first.\n需要 2FA 验证。\n"))
+			conn.Close()
+			return
+		}
+		tokenUUID, ok := sudotoken.Default.Validate(sudoCookie.Value)
+		if !ok {
+			conn.WriteMessage(1, []byte("Sudo token expired. Please re-verify 2FA.\nSudo Token 已过期，请重新验证。\n"))
+			conn.Close()
+			return
+		}
+		if tokenUUID != user_uuid.(string) {
+			conn.WriteMessage(1, []byte("Sudo token UUID mismatch.\n"))
+			conn.Close()
+			return
+		}
+	}
+
+	// 新建一个终端连接
+	id := utils.GenerateRandomString(32)
+	session := &TerminalSession{
+		UserUUID:    user_uuid.(string),
+		UUID:        uuid,
+		Browser:     conn,
+		Agent:       nil,
+		RequesterIp: c.ClientIP(),
+	}
+
+	TerminalSessionsMutex.Lock()
+	TerminalSessions[id] = session
+	TerminalSessionsMutex.Unlock()
+	conn.SetCloseHandler(func(code int, text string) error {
+		logger.InfoArgs("terminal", "Terminal connection closed:", code, text)
+		TerminalSessionsMutex.Lock()
+		delete(TerminalSessions, id)
+		TerminalSessionsMutex.Unlock()
+		// 通知 Agent 关闭终端连接
+		if session.Agent != nil {
+			session.Agent.Close()
+		}
+		return nil
+	})
+
+	if agent_runtime.GetConnectedClients()[uuid] == nil {
+		conn.WriteMessage(1, []byte("Client offline!\n被控端离线!\n"))
+		conn.Close()
+		TerminalSessionsMutex.Lock()
+		delete(TerminalSessions, id)
+		TerminalSessionsMutex.Unlock()
+		return
+	}
+	err = agent_runtime.GetConnectedClients()[uuid].WriteJSON(gin.H{
+		"message":    "terminal",
+		"request_id": id,
+	})
+	if err != nil {
+		conn.Close()
+		TerminalSessionsMutex.Lock()
+		delete(TerminalSessions, id)
+		TerminalSessionsMutex.Unlock()
+		return
+	}
+	conn.WriteMessage(1, []byte("等待被控端连接 waiting for agent...\n"))
+	// 如果没有连接上，则关闭连接
+	time.AfterFunc(30*time.Second, func() {
+		TerminalSessionsMutex.Lock()
+		if session.Agent == nil {
+			if session.Browser != nil {
+				session.Browser.WriteMessage(1, []byte("被控端连接超时 timeout\n"))
+				session.Browser.Close()
+			}
+			conn.Close()
+			delete(TerminalSessions, id)
+		}
+		TerminalSessionsMutex.Unlock()
+	})
+	//auditlog.Log(c.ClientIP(), user_uuid.(string), "request, terminal id:"+id+",client:"+session.UUID, "terminal")
+}

@@ -1,8 +1,9 @@
 package factory
 
 import (
-	"log"
 	"strings"
+
+	logger "github.com/komari-monitor/komari/utils/log"
 
 	"github.com/komari-monitor/komari/utils/item"
 )
@@ -23,7 +24,7 @@ func RegisterMessageSender(constructor MessageSenderConstructor) {
 	senderConstructor[name] = constructor
 	senderConstructorLower[strings.ToLower(name)] = name
 	if _, exists := senders[name]; exists {
-		log.Println("Message sender already registered: " + name)
+		logger.InfoArgs("message-sender", "Message sender already registered: "+name)
 	}
 	senders[name] = sender
 
@@ -41,7 +42,7 @@ func GetConstructor(name string) (MessageSenderConstructor, bool) {
 	}
 	// 大小写不敏感 fallback：用小写名查找规范名
 	if canonical, ok := senderConstructorLower[strings.ToLower(name)]; ok {
-		log.Printf("Provider name '%s' matched '%s' (case-insensitive)", name, canonical)
+		logger.Infof("message-sender", "Provider name '%s' matched '%s' (case-insensitive)", name, canonical)
 		return senderConstructor[canonical], true
 	}
 	return nil, false
@@ -66,7 +67,7 @@ func GetAllMessageSenderNames() []string {
 func Initialize() {
 	for _, sender := range senders {
 		if err := sender.Init(); err != nil {
-			log.Printf("Failed to initialize message sender %s: %v", sender.GetName(), err)
+			logger.Errorf("message-sender", "Failed to initialize message sender %s: %v", sender.GetName(), err)
 		}
 	}
 }

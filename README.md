@@ -2,6 +2,11 @@
 
 Komari 是一款轻量级服务器监控工具，支持通过网页面板查看服务器状态，通过轻量 Agent 采集数据。
 
+> [!WARNING]
+> Komari 是一款自托管监控和控制程序，仅适用于您拥有或授权管理的系统。不得将 Komari 用于武器化、未经同意部署、未授权访问、持久化驻留、命令执行或其他滥用行为。有关真实滥用风险，请参考 Huntress 的分析：[Komari C2 agent abuse](https://www.huntress.com/blog/komari-c2-agent-abuse)。
+> 用户应对其如何部署和运营 Komari 承担全部责任。开发人员不对未授权或滥用使用以及由此产生的任何后果负责。
+> 在 Windows 上，启用远程控制时，客户端会在每次用户登录时显示 Windows 通知，提醒用户 Komari 是远程控制软件。
+
 ## 生态概览
 
 本组织维护以下四个仓库，它们共同组成 Komari 监控体系：
@@ -13,7 +18,7 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 | [`Komari_ttyd`](https://github.com/zv201413/Komari_ttyd) | Docker 一体镜像（面板 + 网页终端） | ✅ 替代方案 |
 | [`komari-web_new`](https://github.com/zv201413/komari-web_new) | 前端 UI 源码 | ❌ 已编译进 server |
 
-[简体中文](./docs/README_zh.md) | [繁體中文](./docs/README_zh-TW.md) 
+[简体中文](./docs/README_zh.md) | [繁體中文](./docs/README_zh-TW.md)
 
 📖 **详细安装说明**: [`install.md`](./install.md)
 效果展示：
@@ -150,7 +155,6 @@ chmod +x /opt/komari/komari && systemctl restart komari
 - [komari_new Releases](https://github.com/zv201413/komari_new/releases) — Server 二进制
 - [komari-agent_new Releases](https://github.com/zv201413/komari-agent_new/releases) — Agent + install.sh
 - [Komari_ttyd Packages](https://github.com/zv201413/Komari_ttyd/pkgs/container/komari_ttyd) — Docker 镜像
-
 ## Manual Build
 
 ```bash

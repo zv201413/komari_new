@@ -3,17 +3,18 @@ package messageSender
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/komari-monitor/komari/config"
+	logger "github.com/komari-monitor/komari/utils/log"
+
 	"github.com/komari-monitor/komari/database"
 	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils/messageSender/factory"
 )
 
@@ -29,6 +30,18 @@ func CurrentProvider() factory.IMessageSender {
 	return currentProvider
 }
 
+// Shutdown 销毁当前消息发送 provider，释放其持有的资源。供关闭流程调用。
+func Shutdown() error {
+	mu.Lock()
+	defer mu.Unlock()
+	if currentProvider == nil {
+		return nil
+	}
+	err := currentProvider.Destroy()
+	currentProvider = nil
+	return err
+}
+
 func Initialize() {
 	go func() {
 		once.Do(func() {
@@ -41,14 +54,14 @@ func Initialize() {
 				config := provider.GetConfiguration()
 				configBytes, err := json.Marshal(config)
 				if err != nil {
-					log.Printf("Failed to marshal config for provider %s: %v", provider.GetName(), err)
+					logger.Errorf("message-sender", "Failed to marshal config for provider %s: %v", provider.GetName(), err)
 					return
 				}
 				if err := database.SaveMessageSenderConfig(&models.MessageSenderProvider{
 					Name:     provider.GetName(),
 					Addition: string(configBytes),
 				}); err != nil {
-					log.Printf("Failed to save default config for provider %s: %v", provider.GetName(), err)
+					logger.Errorf("message-sender", "Failed to save default config for provider %s: %v", provider.GetName(), err)
 					return
 				}
 			}
@@ -69,7 +82,7 @@ func Initialize() {
 		return
 	}
 	if err := LoadProvider(NotificationMethod, senderConfig.Addition); err != nil {
-		log.Printf("Failed to load provider %s: %v, falling back to empty provider", NotificationMethod, err)
+		logger.Errorf("message-sender", "Failed to load provider %s: %v, falling back to empty provider", NotificationMethod, err)
 		LoadProvider("empty", "{}")
 	}
 }
@@ -99,6 +112,11 @@ func SendTextMessage(message string, title string) error {
 func SendEvent(event models.EventMessage) error {
 	if CurrentProvider() == nil {
 		return fmt.Errorf("message sender provider is not initialized")
+	}
+	if event.Time.IsZero() {
+		event.Time = time.Now().UTC()
+	} else {
+		event.Time = event.Time.UTC()
 	}
 	var err error
 	cfg, err := config.GetMany(map[string]any{
@@ -179,7 +197,7 @@ func parseTemplate(messageTemplate string, event models.EventMessage) string {
 		"{{os}}":      strings.Join(clientOSs, ", "),
 		"{{region}}":  strings.Join(clientRegions, ", "),
 		"{{cpu}}":     strings.Join(clientCPUs, ", "),
-		"{{time}}":    event.Time.Format(time.RFC3339),
+		"{{time}}":    event.Time.In(time.Local).Format(time.RFC3339Nano),
 		"{{message}}": event.Message,
 		"{{emoji}}":   event.Emoji,
 	}

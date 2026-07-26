@@ -6,6 +6,11 @@
 
 Komari 是一款輕量級的自託管伺服器監控工具，旨在提供簡單、高效的伺服器性能監控解決方案。它支援透過 Web 介面查看伺服器狀態，並透過輕量級 Agent 收集數據。
 
+> [!WARNING]
+> Komari 是一款自託管的監控/控制程式，僅應部署在你擁有或已獲授權管理的系統上。請勿將 Komari 武器化，或在未獲授權的情況下部署、存取、持久化、執行命令及從事其他濫用行為。關於現實中的濫用風險，可參考 Huntress 的分析：[Komari C2 agent abuse](https://www.huntress.com/blog/komari-c2-agent-abuse)。
+> 使用者需要自行承擔部署和使用 Komari 的責任。開發者不對未經授權或濫用行為及其後果承擔責任。
+> 在 Windows 端啟用遠端控制後，客戶端會在每次使用者登入時透過 Windows 通知提醒使用者 Komari 是一款遠端控制軟體。
+
 [文檔](https://komari-document.pages.dev/) | [Telegram 群組](https://t.me/komari_monitor)
 
 ## 特性
@@ -50,14 +55,7 @@ sudo ./install-komari.sh
      --name komari \
      ghcr.io/komari-monitor/komari:latest
    ```
-3. 查看預設帳號和密碼：
-   ```bash
-   docker logs komari
-   ```
-4. 在瀏覽器中存取 `http://<your_server_ip>:25774`。
-
-> [!NOTE]
-> 你也可以透過環境變數 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 自訂初始使用者名稱和密碼。
+3. 在瀏覽器中存取 `http://<your_server_ip>:25774` 並完成安裝精靈。精靈會建立管理員帳號，並設定站點中繼資料和監控資料庫。
 
 ### 3. 二進位檔案部署
 
@@ -67,7 +65,7 @@ sudo ./install-komari.sh
    ./komari server -l 0.0.0.0:25774
    ```
 3. 在瀏覽器中存取 `http://<your_server_ip>:25774`，預設監聽 `25774` 連接埠。
-4. 預設帳號和密碼可在啟動日誌中查看，或透過環境變數 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 設定。
+4. 按照安裝精靈建立管理員帳號，並設定站點中繼資料和監控資料庫。
 
 > [!NOTE]
 > 確保二進位檔案具有可執行權限（`chmod +x komari`）。資料將保存在執行目錄下的 `data` 資料夾中。
@@ -90,7 +88,7 @@ sudo ./install-komari.sh
    git clone https://github.com/komari-monitor/komari
    cd komari
    ```
-   將步驟1中產生的靜態檔案複製到 `komari` 專案根目錄下的 `/public/defaultTheme/dist` 資料夾，並將 `komari-theme.json` 與 `preview.png`/`perview.png` 複製到 `/public/defaultTheme`。
+   將步驟1中產生的靜態檔案複製到 `komari` 專案根目錄下的 `/web/public/defaultTheme/dist` 資料夾，並將 `komari-theme.json` 與 `preview.png`/`perview.png` 複製到 `/web/public/defaultTheme`。
    ```bash
    go build -o komari
    ```

@@ -1,32 +1,20 @@
 package clients
 
 import (
-	"log"
+	"encoding/json"
+	"fmt"
+	logger "github.com/komari-monitor/komari/utils/log"
 	"math"
 	"time"
 
-	"github.com/komari-monitor/komari/common"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
 	"github.com/komari-monitor/komari/database/tasks"
 	"github.com/komari-monitor/komari/utils"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-
-	"fmt"
 
 	"github.com/google/uuid"
 )
 
-// Deprecated: DeleteClientConfig is deprecated and will be removed in a future release. Use DeleteClient instead.
-func DeleteClientConfig(clientUuid string) error {
-	db := dbcore.GetDBInstance()
-	err := db.Delete(&common.ClientConfig{ClientUUID: clientUuid}).Error
-	if err != nil {
-		return err
-	}
-	return nil
-}
 func DeleteClient(clientUuid string) error {
 	db := dbcore.GetDBInstance()
 	err := db.Delete(&models.Client{}, "uuid = ?", clientUuid).Error
@@ -36,83 +24,6 @@ func DeleteClient(clientUuid string) error {
 	return nil
 }
 
-// Deprecated: UpdateOrInsertBasicInfo is deprecated and will be removed in a future release. Use SaveClientInfo instead.
-func UpdateOrInsertBasicInfo(cbi common.ClientInfo) error {
-	db := dbcore.GetDBInstance()
-	updates := make(map[string]interface{})
-
-	if cbi.Name != "" {
-		updates["name"] = cbi.Name
-	}
-	if cbi.CpuName != "" {
-		updates["cpu_name"] = cbi.CpuName
-	}
-	if cbi.Arch != "" {
-		updates["arch"] = cbi.Arch
-	}
-	if cbi.CpuCores > 0 {
-		updates["cpu_cores"] = cbi.CpuCores
-	}
-	if cbi.OS != "" {
-		updates["os"] = cbi.OS
-	}
-	if cbi.GpuName != "" {
-		updates["gpu_name"] = cbi.GpuName
-	}
-	if cbi.IPv4 != "" {
-		updates["ipv4"] = cbi.IPv4
-	}
-	if cbi.IPv6 != "" {
-		updates["ipv6"] = cbi.IPv6
-	}
-	if cbi.Region != "" {
-		updates["region"] = cbi.Region
-	}
-	if cbi.Remark != "" {
-		updates["remark"] = cbi.Remark
-	}
-	updates["mem_total"] = cbi.MemTotal
-	updates["swap_total"] = cbi.SwapTotal
-	updates["disk_total"] = cbi.DiskTotal
-	updates["version"] = cbi.Version
-	if cbi.TcpCc != "" {
-		updates["tcp_cc"] = cbi.TcpCc
-	}
-	updates["updated_at"] = time.Now()
-
-	// 转换为更新Client表
-	client := models.Client{
-		UUID: cbi.UUID,
-	}
-
-	err := db.Model(&client).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "uuid"}},
-		DoUpdates: clause.Assignments(updates),
-	}).Create(map[string]interface{}{
-		"uuid":       cbi.UUID,
-		"name":       cbi.Name,
-		"cpu_name":   cbi.CpuName,
-		"arch":       cbi.Arch,
-		"cpu_cores":  cbi.CpuCores,
-		"os":         cbi.OS,
-		"gpu_name":   cbi.GpuName,
-		"ipv4":       cbi.IPv4,
-		"ipv6":       cbi.IPv6,
-		"region":     cbi.Region,
-		"remark":     cbi.Remark,
-		"mem_total":  cbi.MemTotal,
-		"swap_total": cbi.SwapTotal,
-		"disk_total": cbi.DiskTotal,
-		"version":    cbi.Version,
-		"tcp_cc":     cbi.TcpCc,
-		"updated_at": time.Now(),
-	}).Error
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
 func SaveClientInfo(update map[string]interface{}) error {
 	db := dbcore.GetDBInstance()
 	clientUUID, ok := update["uuid"].(string)
@@ -125,29 +36,75 @@ func SaveClientInfo(update map[string]interface{}) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	update["updated_at"] = time.Now()
+	update["updated_at"] = time.Now().UTC()
 
-	checkInt64 := func(name string, val float64) error {
-		if val < 0 {
-			return fmt.Errorf("%s must be non-negative, got %d", name, int64(val))
+	toFloat64 := func(value interface{}) (float64, bool) {
+		switch typed := value.(type) {
+		case float64:
+			return typed, true
+		case float32:
+			return float64(typed), true
+		case int:
+			return float64(typed), true
+		case int8:
+			return float64(typed), true
+		case int16:
+			return float64(typed), true
+		case int32:
+			return float64(typed), true
+		case int64:
+			return float64(typed), true
+		case uint:
+			return float64(typed), true
+		case uint8:
+			return float64(typed), true
+		case uint16:
+			return float64(typed), true
+		case uint32:
+			return float64(typed), true
+		case uint64:
+			return float64(typed), true
+		case json.Number:
+			parsed, err := typed.Float64()
+			if err != nil {
+				return 0, false
+			}
+			return parsed, true
+		default:
+			return 0, false
 		}
-		if val > math.MaxInt64-1 {
-			return fmt.Errorf("%s exceeds int64 max limit: %d", name, int64(val))
+	}
+
+	checkOptionalInt := func(name, key string, maxValue float64) error {
+		value, exists := update[key]
+		if !exists || value == nil {
+			return nil
+		}
+
+		numericValue, ok := toFloat64(value)
+		if !ok {
+			return fmt.Errorf("%s must be a valid number", name)
+		}
+		if numericValue < 0 || numericValue > maxValue {
+			return fmt.Errorf("%s must be a valid non-negative number: %v", name, value)
 		}
 		return nil
 	}
 
 	verify := func(update map[string]interface{}) error {
-		if update["cpu_cores"].(float64) < 0 {
-			return fmt.Errorf("Cpu.Cores must be non-negative, got %v", update["cpu_cores"])
-		}
-		if err := checkInt64("Ram.Total", update["mem_total"].(float64)); err != nil {
+		if err := checkOptionalInt("Cpu.Cores", "cpu_cores", math.MaxInt-1); err != nil {
 			return err
 		}
-		if err := checkInt64("Swap.Total", update["swap_total"].(float64)); err != nil {
+		if err := checkOptionalInt("Cpu.PhysicalCores", "cpu_physical_cores", math.MaxInt-1); err != nil {
 			return err
 		}
-		if err := checkInt64("Disk.Total", update["disk_total"].(float64)); err != nil {
+		if err := checkOptionalInt("Ram.Total", "mem_total", math.MaxInt64-1); err != nil {
+			return err
+		}
+		if err := checkOptionalInt("Swap.Total", "swap_total", math.MaxInt64-1); err != nil {
+			return err
+		}
+		if err := checkOptionalInt("Disk.Total", "disk_total", math.MaxInt64-1); err != nil {
 			return err
 		}
 		return nil
@@ -164,49 +121,6 @@ func SaveClientInfo(update map[string]interface{}) error {
 	return nil
 }
 
-// 更新客户端设置
-func UpdateClientConfig(config common.ClientConfig) error {
-	db := dbcore.GetDBInstance()
-	err := db.Save(&config).Error
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func EditClientName(clientUUID, clientName string) error {
-	db := dbcore.GetDBInstance()
-	err := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Update("name", clientName).Error
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-/*
-// UpdateClientByUUID 更新指定 UUID 的客户端配置
-
-	func UpdateClientByUUID(config common.ClientConfig) error {
-		db := dbcore.GetDBInstance()
-		result := db.Model(&common.ClientConfig{}).Where("client_uuid = ?", config.ClientUUID).Updates(config)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		return nil
-	}
-*/
-func EditClientToken(clientUUID, token string) error {
-	db := dbcore.GetDBInstance()
-	err := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Update("token", token).Error
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // CreateClient 创建新客户端
 func CreateClient() (clientUUID, token string, err error) {
 	db := dbcore.GetDBInstance()
@@ -217,8 +131,8 @@ func CreateClient() (clientUUID, token string, err error) {
 		UUID:      clientUUID,
 		Token:     token,
 		Name:      "client_" + clientUUID[0:8],
-		CreatedAt: models.FromTime(time.Now()),
-		UpdatedAt: models.FromTime(time.Now()),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 
 	err = db.Create(&client).Error
@@ -226,7 +140,7 @@ func CreateClient() (clientUUID, token string, err error) {
 		return "", "", err
 	}
 	if err := tasks.AddDefaultOnClientUUID(clientUUID); err != nil {
-		log.Println("Failed to apply default-on ping tasks to new client:", err)
+		logger.ErrorArgs("clients", "Failed to apply default-on ping tasks to new client:", err)
 	}
 	return clientUUID, token, nil
 }
@@ -242,8 +156,8 @@ func CreateClientWithName(name string) (clientUUID, token string, err error) {
 		UUID:      clientUUID,
 		Token:     token,
 		Name:      name,
-		CreatedAt: models.FromTime(time.Now()),
-		UpdatedAt: models.FromTime(time.Now()),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 
 	err = db.Create(&client).Error
@@ -251,7 +165,7 @@ func CreateClientWithName(name string) (clientUUID, token string, err error) {
 		return "", "", err
 	}
 	if err := tasks.AddDefaultOnClientUUID(clientUUID); err != nil {
-		log.Println("Failed to apply default-on ping tasks to new client:", err)
+		logger.ErrorArgs("clients", "Failed to apply default-on ping tasks to new client:", err)
 	}
 	return clientUUID, token, nil
 }
@@ -272,19 +186,6 @@ func GetClientByUUID(uuid string) (client models.Client, err error) {
 	db := dbcore.GetDBInstance()
 	err = db.Where("uuid = ?", uuid).First(&client).Error
 	if err != nil {
-		return models.Client{}, err
-	}
-	return client, nil
-}
-
-// GetClientBasicInfo 获取指定 UUID 的客户端基本信息
-func GetClientBasicInfo(uuid string) (client models.Client, err error) {
-	db := dbcore.GetDBInstance()
-	err = db.Where("uuid = ?", uuid).First(&client).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return models.Client{}, fmt.Errorf("客户端不存在: %s", uuid)
-		}
 		return models.Client{}, err
 	}
 	return client, nil
@@ -328,8 +229,30 @@ func SaveClient(updates map[string]interface{}) error {
 			}
 		}
 	}
+	if value, exists := updates["expired_at"]; exists {
+		switch typed := value.(type) {
+		case nil:
+			updates["expired_at"] = nil
+		case time.Time:
+			updates["expired_at"] = typed.UTC()
+		case *time.Time:
+			if typed == nil {
+				updates["expired_at"] = nil
+			} else {
+				updates["expired_at"] = typed.UTC()
+			}
+		case string:
+			stamp, err := time.Parse(time.RFC3339Nano, typed)
+			if err != nil {
+				return fmt.Errorf("expired_at must be an RFC3339 timestamp with a timezone: %w", err)
+			}
+			updates["expired_at"] = stamp.UTC()
+		default:
+			return fmt.Errorf("expired_at must be an RFC3339 timestamp with a timezone")
+		}
+	}
 
-	updates["updated_at"] = time.Now()
+	updates["updated_at"] = time.Now().UTC()
 
 	err := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(updates).Error
 	if err != nil {

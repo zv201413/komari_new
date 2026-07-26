@@ -1,7 +1,8 @@
 package notifier
 
 import (
-	"log"
+	"fmt"
+	logger "github.com/komari-monitor/komari/utils/log"
 	"reflect"
 	"sync"
 	"time"
@@ -11,21 +12,18 @@ import (
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
 	"github.com/komari-monitor/komari/database/records"
+	"github.com/komari-monitor/komari/internal/scheduler"
 	"github.com/komari-monitor/komari/utils/messageSender"
 )
 
 // LoadNotificationService 管理定时器和任务
 type LoadNotificationService struct {
-	mu       sync.Mutex
-	tickers  map[int]*time.Ticker
-	tasks    map[int][]models.LoadNotification
-	stopChan chan struct{}
+	mu    sync.Mutex
+	tasks map[int][]models.LoadNotification
 }
 
 var LoadNotificationManager = &LoadNotificationService{
-	tickers:  make(map[int]*time.Ticker),
-	tasks:    make(map[int][]models.LoadNotification),
-	stopChan: make(chan struct{}),
+	tasks: make(map[int][]models.LoadNotification),
 }
 
 // Reload 重载时间表
@@ -33,11 +31,7 @@ func (m *LoadNotificationService) Reload(loadNotifications []models.LoadNotifica
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 停止所有现有定时器
-	for _, ticker := range m.tickers {
-		ticker.Stop()
-	}
-	m.tickers = make(map[int]*time.Ticker)
+	scheduler.RemovePrefix("load-notification:")
 	m.tasks = make(map[int][]models.LoadNotification)
 
 	// 按Interval分组任务
@@ -48,22 +42,16 @@ func (m *LoadNotificationService) Reload(loadNotifications []models.LoadNotifica
 
 	// 为每个唯一的Interval创建定时器
 	for interval, tasks := range taskGroups {
-		ticker := time.NewTicker(time.Duration(interval) * time.Minute)
-		m.tickers[interval] = ticker
+		interval := interval
+		tasks := append([]models.LoadNotification(nil), tasks...)
 		m.tasks[interval] = tasks
-
-		go func(ticker *time.Ticker, tasks []models.LoadNotification) {
-			for {
-				select {
-				case <-ticker.C:
-					for _, task := range tasks {
-						go executeLoadNotificationTask(task)
-					}
-				case <-m.stopChan:
-					return
-				}
+		if err := scheduler.AddFunc(fmt.Sprintf("load-notification:%d", interval), scheduler.Every(time.Duration(interval)*time.Minute), func() {
+			for _, task := range tasks {
+				go executeLoadNotificationTask(task)
 			}
-		}(ticker, tasks)
+		}); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -76,7 +64,7 @@ func executeLoadNotificationTask(task models.LoadNotification) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	windowStart := now.Add(-time.Duration(task.Interval) * time.Minute)
 	overloadClients := make([]string, 0)
 	for _, clientUUID := range task.Clients {
@@ -98,13 +86,13 @@ func executeLoadNotificationTask(task models.LoadNotification) {
 
 // shouldSkipNotification 检查是否应该跳过通知（冷却期检查）
 func shouldSkipNotification(task models.LoadNotification) bool {
-	if task.LastNotified.ToTime().IsZero() {
+	if task.LastNotified == nil || task.LastNotified.IsZero() {
 		return false
 	}
 
 	// 计算冷却期（使用 interval 作为冷却期）
 	cooldownPeriod := time.Duration(task.Interval) * time.Minute
-	timeSinceLastNotified := time.Since(task.LastNotified.ToTime())
+	timeSinceLastNotified := time.Since(*task.LastNotified)
 
 	return timeSinceLastNotified < cooldownPeriod
 }
@@ -152,7 +140,7 @@ func getMetricValue(record models.Record, metric string) float32 {
 	case "ram":
 		client, err := clients.GetClientByUUID(record.Client) // 确保客户端信息已加载
 		if err != nil {
-			log.Printf("Failed to get client info for %s: %v", record.Client, err)
+			logger.Errorf("notifier", "Failed to get client info for %s: %v", record.Client, err)
 			return 0
 		}
 		if record.RamTotal > 0 {
@@ -162,7 +150,7 @@ func getMetricValue(record models.Record, metric string) float32 {
 	case "swap":
 		client, err := clients.GetClientByUUID(record.Client) // 确保客户端信息已加载
 		if err != nil {
-			log.Printf("Failed to get client info for %s: %v", record.Client, err)
+			logger.Errorf("notifier", "Failed to get client info for %s: %v", record.Client, err)
 			return 0
 		}
 		if record.SwapTotal > 0 {
@@ -176,7 +164,7 @@ func getMetricValue(record models.Record, metric string) float32 {
 	case "disk":
 		client, err := clients.GetClientByUUID(record.Client) // 确保客户端信息已加载
 		if err != nil {
-			log.Printf("Failed to get client info for %s: %v", record.Client, err)
+			logger.Errorf("notifier", "Failed to get client info for %s: %v", record.Client, err)
 			return 0
 		}
 		if record.DiskTotal > 0 {
@@ -226,7 +214,7 @@ func sendLoadNotification(clientUUIDs []string, task models.LoadNotification) {
 		messageSender.SendEvent(models.EventMessage{
 			Event:   messageevent.Alert,
 			Clients: ex_clients,
-			Time:    time.Now(),
+			Time:    time.Now().UTC(),
 			Emoji:   "⚠️",
 			Message: task.Name,
 		})
@@ -236,8 +224,8 @@ func sendLoadNotification(clientUUIDs []string, task models.LoadNotification) {
 // updateLastNotified 更新最后通知时间
 func updateLastNotified(taskId uint, notifyTime time.Time) {
 	db := dbcore.GetDBInstance()
-	if err := db.Model(&models.LoadNotification{}).Where("id = ?", taskId).Update("last_notified", notifyTime).Error; err != nil {
-		log.Printf("Failed to update last_notified for task %d: %v", taskId, err)
+	if err := db.Model(&models.LoadNotification{}).Where("id = ?", taskId).Update("last_notified", notifyTime.UTC()).Error; err != nil {
+		logger.Errorf("notifier", "Failed to update last_notified for task %d: %v", taskId, err)
 	}
 }
 

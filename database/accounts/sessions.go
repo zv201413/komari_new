@@ -6,10 +6,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
+	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/geoip"
 	"github.com/komari-monitor/komari/utils/messageSender"
@@ -33,11 +33,11 @@ func CreateSession(uuid string, expires int, userAgent, ip, login_method string)
 	sessionRecord := models.Session{
 		UUID:         uuid,
 		Session:      session,
-		Expires:      models.FromTime(time.Now().Add(time.Duration(expires) * time.Second)),
+		Expires:      time.Now().UTC().Add(time.Duration(expires) * time.Second),
 		UserAgent:    userAgent,
 		Ip:           ip,
 		LoginMethod:  login_method,
-		LatestOnline: models.FromTime(time.Now()),
+		LatestOnline: time.Now().UTC(),
 	}
 	go func() {
 		LoginNotification, _ := config.GetAs[bool](config.LoginNotificationKey, false)
@@ -49,16 +49,16 @@ func CreateSession(uuid string, expires int, userAgent, ip, login_method string)
 				loc = ipinfo.Name
 			}
 			messageSender.SendEvent(models.EventMessage{
-				Event:   messageevent.Login,
+				Event: messageevent.Login,
 				Clients: []models.Client{
 					{
-						Name:    "Dashboard",
-						IPv4:    ip,
-						Region:  loc,
-						OS:      userAgent,
+						Name:   "Dashboard",
+						IPv4:   ip,
+						Region: loc,
+						OS:     userAgent,
 					},
 				},
-				Time:    time.Now(),
+				Time:    time.Now().UTC(),
 				Message: fmt.Sprintf("Method: %s", login_method),
 				Emoji:   "🔑",
 			})
@@ -81,7 +81,7 @@ func GetSession(session string) (uuid string, err error) {
 		return "", err
 	}
 
-	if time.Now().After(sessionRecord.Expires.ToTime()) {
+	if time.Now().UTC().After(sessionRecord.Expires) {
 		// 会话已过期，删除它
 		_ = DeleteSession(session)
 		return "", errors.New("session expired")
@@ -119,24 +119,10 @@ func DeleteAllSessions() error {
 	return nil
 }
 
-func UpdateLatestOnline(session string) error {
-	db := dbcore.GetDBInstance()
-	return db.Model(&models.Session{}).Where("session = ?", session).Update("latest_online", time.Now()).Error
-}
-
-func UpdateLatestUserAgent(session, userAgent string) error {
-	db := dbcore.GetDBInstance()
-	return db.Model(&models.Session{}).Where("session = ?", session).Update("latest_user_agent", userAgent).Error
-}
-func UpdateLatestIp(session, ip string) error {
-	db := dbcore.GetDBInstance()
-	return db.Model(&models.Session{}).Where("session = ?", session).Update("latest_ip", ip).Error
-}
-
 func UpdateLatest(session, useragent, ip string) error {
 	db := dbcore.GetDBInstance()
 	return db.Model(&models.Session{}).Where("session = ?", session).Updates(map[string]interface{}{
-		"latest_online":     time.Now(),
+		"latest_online":     time.Now().UTC(),
 		"latest_user_agent": useragent,
 		"latest_ip":         ip,
 	}).Error
@@ -144,7 +130,7 @@ func UpdateLatest(session, useragent, ip string) error {
 
 func RemoveExpiredSessions() error {
 	db := dbcore.GetDBInstance()
-	result := db.Where("expires < ?", time.Now()).Delete(&models.Session{})
+	result := db.Where("expires < ?", time.Now().UTC()).Delete(&models.Session{})
 	if result.Error != nil {
 		return result.Error
 	}

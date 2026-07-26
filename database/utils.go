@@ -1,20 +1,22 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
-	"log"
+	logger "github.com/komari-monitor/komari/utils/log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/dbcore"
+	"github.com/komari-monitor/komari/database/metricstore"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/internal/config"
 )
 
 func GetPublicInfo() (map[string]interface{}, error) {
-	cstPtr, err := config.GetManyAs[config.Legacy]()
+	cstPtr, err := config.GetManyAs[config.Settings]()
 	if err != nil {
 		return nil, err
 	}
@@ -42,15 +44,6 @@ func GetPublicInfo() (map[string]interface{}, error) {
 	if !hasKey("o_auth_provider") {
 		cst.OAuthProvider = "github"
 	}
-	if !hasKey("record_enabled") {
-		cst.RecordEnabled = true
-	}
-	if !hasKey("record_preserve_time") {
-		cst.RecordPreserveTime = 720
-	}
-	if !hasKey("ping_record_preserve_time") {
-		cst.PingRecordPreserveTime = 24
-	}
 
 	// Fallback defaults if we couldn't enumerate keys.
 	if allErr != nil {
@@ -61,7 +54,10 @@ func GetPublicInfo() (map[string]interface{}, error) {
 			cst.Description = "Komari Monitor, a simple server monitoring tool."
 		}
 	}
-
+	retention, err := metricstore.GetRetentionSummary(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	db := dbcore.GetDBInstance()
 	tc := models.ThemeConfiguration{}
 	err = db.Model(&models.ThemeConfiguration{}).Where("short = ?", cst.Theme).First(&tc).Error
@@ -71,7 +67,7 @@ func GetPublicInfo() (map[string]interface{}, error) {
 	tc_data := gin.H{}
 	err = json.Unmarshal([]byte(tc.Data), &tc_data)
 	if err != nil {
-		log.Printf("%v", err)
+		logger.Infof("database", "%v", err)
 	}
 	// Try to load theme declaration file and merge defaults for managed configuration
 	// Theme declarations live in ./data/theme/<short>/komari-theme.json
@@ -134,11 +130,12 @@ func GetPublicInfo() (map[string]interface{}, error) {
 		"oauth_enable":              cst.OAuthEnabled,
 		"oauth_provider":            cst.OAuthProvider,
 		"disable_password_login":    cst.DisablePasswordLogin,
-		"allow_cors":                cst.AllowCors,
-		"record_enabled":            cst.RecordEnabled,
-		"record_preserve_time":      cst.RecordPreserveTime,
-		"ping_record_preserve_time": cst.PingRecordPreserveTime,
+		"cors_origin_check_enabled": cst.CorsOriginCheckEnabled,
+		"record_enabled":            retention.AllPositive, // 兼容旧版本主题
+		"record_preserve_time":      retention.MaxDays * 24,
+		"ping_record_preserve_time": retention.MaxDays * 24,
 		"private_site":              cst.PrivateSite,
+		"visitor_audit_enabled":     cst.VisitorAuditEnabled,
 		"theme":                     cst.Theme,
 		"theme_settings":            tc_data,
 	}, nil

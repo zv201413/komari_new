@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
+	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils/messageSender"
 )
+
+// isEffectivelyZero 判断可空时间是否等价于"未设置"（nil、零值或 1 年，兼容非 UTC 的 IsZero 缺陷）。
+// 替代旧 LocalTime.IsEffectivelyZero：新架构时间字段已改为原生 *time.Time。
+func isEffectivelyZero(t *time.Time) bool {
+	return t == nil || t.IsZero() || t.Year() == 1
+}
 
 func CheckSignInScheduledWork() {
 	for {
@@ -42,43 +48,47 @@ func CheckSignInScheduledWork() {
 			}
 
 			// Use sign_in_target_date as fallback when expired_at is not set
-			expiry := client.ExpiredAt.ToTime()
-			if client.ExpiredAt.IsEffectivelyZero() {
-				if client.SignInTargetDate == nil || client.SignInTargetDate.IsEffectivelyZero() {
+			var expiry time.Time
+			if !isEffectivelyZero(client.ExpiredAt) {
+				expiry = client.ExpiredAt.UTC()
+			} else {
+				if isEffectivelyZero(client.SignInTargetDate) {
 					continue
 				}
-				expiry = client.SignInTargetDate.ToTime()
+				expiry = client.SignInTargetDate.UTC()
 			}
 
 			// Calculate absolute days left
 			daysLeft := float64(expiry.Sub(now).Hours() / 24)
 
-			if daysLeft <= float64(client.SignInAlertDaysBefore) || client.LastSignInAlertAt.ToTime().IsZero() {
+			if daysLeft <= float64(client.SignInAlertDaysBefore) || client.LastSignInAlertAt.IsZero() {
 				// Check interval
 				intervalHours := float64(client.SignInAlertIntervalHours)
 				if intervalHours <= 0 {
 					intervalHours = 12 // fallback
 				}
 
-				if now.Sub(client.LastSignInAlertAt.ToTime()).Hours() >= intervalHours {
+				if now.Sub(client.LastSignInAlertAt).Hours() >= intervalHours {
 					// Need to notify
 					notifyClients = append(notifyClients, client)
-					
+
 					// Update LastSignInAlertAt
-					dbcore.GetDBInstance().Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("last_sign_in_alert_at", models.FromTime(now))
+					dbcore.GetDBInstance().Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("last_sign_in_alert_at", now)
 				}
 			}
 		}
 
 		if len(notifyClients) > 0 {
 			for _, client := range notifyClients {
-				expiry := client.ExpiredAt.ToTime()
-				if client.ExpiredAt.IsEffectivelyZero() && client.SignInTargetDate != nil && !client.SignInTargetDate.IsEffectivelyZero() {
-					expiry = client.SignInTargetDate.ToTime()
+				expiry := time.Time{}
+				if !isEffectivelyZero(client.ExpiredAt) {
+					expiry = client.ExpiredAt.UTC()
+				} else if !isEffectivelyZero(client.SignInTargetDate) {
+					expiry = client.SignInTargetDate.UTC()
 				}
 				daysLeft := int(expiry.Sub(now).Hours() / 24)
 				message := fmt.Sprintf("Node %s needs sign-in! It will expire in %d day(s) on %s. Please sign-in.", client.Name, daysLeft, expiry.Format("2006-01-02"))
-				
+
 				messageSender.SendEvent(models.EventMessage{
 					Event:   messageevent.SignIn,
 					Clients: []models.Client{client},

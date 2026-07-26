@@ -2,16 +2,16 @@ package notifier
 
 import (
 	"fmt"
-	"log/slog"
 	"math"
 	"strings"
 	"time"
 
-	"github.com/komari-monitor/komari/config"
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/internal/config"
+	logger "github.com/komari-monitor/komari/utils/log"
 	"github.com/komari-monitor/komari/utils/messageSender"
-	"github.com/komari-monitor/komari/ws"
+	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	cache "github.com/patrickmn/go-cache"
 )
 
@@ -23,13 +23,13 @@ var trafficCache = cache.New(30*24*time.Hour, time.Hour) // 30天缓存，1小�
 // 由外部协程每分钟调用一次
 func CheckTraffic() {
 	// 获取最新上报与客户端配置
-	reports := ws.GetLatestReport()
+	reports := agent_runtime.GetLatestReport()
 	if len(reports) == 0 {
 		return
 	}
 	cfg, err := config.GetAs[float64](config.TrafficLimitPercentageKey, 80.0)
 	if err != nil {
-		slog.Error("failed to get traffic limit percentage", "error", err)
+		logger.Error("notifier", "failed to get traffic limit percentage", "error", err)
 	}
 
 	if cfg <= 0 {
@@ -92,13 +92,13 @@ func CheckTraffic() {
 
 		if curStep > lastStep { // 只在进入新步进时提醒一次
 			trafficCache.SetDefault(key, curStep)
-		
+
 			msg := fmt.Sprintf("used %d%% (%s / %s), type=%s", curStep, humanBytes(used), humanBytes(c.TrafficLimit), strings.ToLower(c.TrafficLimitType))
 			// 发送通知（内部会检查 NotificationEnabled）
 			_ = messageSender.SendEvent(models.EventMessage{
 				Event:   "Traffic",
 				Clients: []models.Client{c},
-				Time:    time.Now(),
+				Time:    time.Now().UTC(),
 				Emoji:   "⚠️",
 				Message: msg,
 			})

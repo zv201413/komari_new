@@ -1,9 +1,11 @@
 package tasks
 
 import (
+	"context"
 	"time"
 
 	"github.com/komari-monitor/komari/database/dbcore"
+	"github.com/komari-monitor/komari/database/metricstore"
 	"github.com/komari-monitor/komari/database/models"
 	"github.com/komari-monitor/komari/utils"
 	"gorm.io/gorm"
@@ -45,6 +47,12 @@ func AddPingTask(clients []string, defaultOn bool, name string, target, task_typ
 }
 
 func DeletePingTask(id []uint) error {
+	// The metric store is independent from the main database, so clean it first
+	// to avoid leaving history that can no longer be addressed through the task.
+	if err := DeletePingRecords(id); err != nil {
+		return err
+	}
+
 	db := dbcore.GetDBInstance()
 	result := db.Where("id IN ?", id).Delete(&models.PingTask{})
 	if result.RowsAffected == 0 {
@@ -125,38 +133,24 @@ func UpdatePingTaskOrder(order map[uint]int) error {
 	return nil
 }
 
-func SavePingRecord(record models.PingRecord) error {
-	db := dbcore.GetDBInstance()
-	return db.Create(&record).Error
-}
+// ping 记录已完全迁移到 metric store（指标 ping.latency_ms），运行期读写全部走
+// metric store，旧 ping_records 表不再参与。
 
-func DeletePingRecordsBefore(time time.Time) error {
-	db := dbcore.GetDBInstance()
-	err := db.Where("time < ?", time).Delete(&models.PingRecord{}).Error
-	return err
+func SavePingRecord(record models.PingRecord) error {
+	return metricstore.WritePingRecord(context.Background(), record)
 }
 
 func DeletePingRecords(id []uint) error {
-	db := dbcore.GetDBInstance()
-	result := db.Where("task_id IN ?", id).Delete(&models.PingRecord{})
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return result.Error
+	return metricstore.DeletePingRecordsByTask(context.Background(), id)
 }
 
 func DeleteAllPingRecords() error {
-	db := dbcore.GetDBInstance()
-	result := db.Exec("DELETE FROM ping_records")
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return result.Error
+	return metricstore.DeleteAllPingRecords(context.Background())
 }
+
 func ReloadPingSchedule() error {
-	db := dbcore.GetDBInstance()
-	var pingTasks []models.PingTask
-	if err := db.Find(&pingTasks).Error; err != nil {
+	pingTasks, err := GetAllPingTasks()
+	if err != nil {
 		return err
 	}
 	return utils.ReloadPingSchedule(pingTasks)
@@ -200,53 +194,6 @@ func AddDefaultOnClientUUID(uuid string) error {
 	return nil
 }
 
-// MigrateAllClientsExpansion 启动时把旧版 default_on=true 且 clients 为空的任务展开为当前所有客户端 UUID。
-// 迁移后 clients 始终是显式列表，调度路径不再依赖 default_on。
-func MigrateAllClientsExpansion() error {
-	db := dbcore.GetDBInstance()
-	var tasks []models.PingTask
-	if err := db.Where("all_clients = ?", true).Find(&tasks).Error; err != nil {
-		return err
-	}
-	if len(tasks) == 0 {
-		return nil
-	}
-	var clients []models.Client
-	if err := db.Select("uuid").Find(&clients).Error; err != nil {
-		return err
-	}
-	if len(clients) == 0 {
-		return nil
-	}
-	allUUIDs := make(models.StringArray, 0, len(clients))
-	for _, c := range clients {
-		if c.UUID != "" {
-			allUUIDs = append(allUUIDs, c.UUID)
-		}
-	}
-	for _, task := range tasks {
-		if len(task.Clients) > 0 {
-			continue
-		}
-		if err := db.Model(&models.PingTask{}).Where("id = ?", task.Id).Update("clients", allUUIDs).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
-	db := dbcore.GetDBInstance()
-	var records []models.PingRecord
-	dbQuery := db.Model(&models.PingRecord{})
-	if uuid != "" {
-		dbQuery = dbQuery.Where("client = ?", uuid)
-	}
-	if taskId >= 0 {
-		dbQuery = dbQuery.Where("task_id = ?", uint(taskId))
-	}
-	if err := dbQuery.Where("time >= ? AND time <= ?", start, end).Order("time DESC").Find(&records).Error; err != nil {
-		return nil, err
-	}
-	return records, nil
+	return metricstore.GetPingRecords(context.Background(), uuid, taskId, start, end)
 }
