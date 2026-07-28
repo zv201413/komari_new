@@ -30,16 +30,9 @@ func ClientSignIn(c *gin.Context) {
 	}
 
 	now := time.Now()
-	// 从 expired_at 起算（与自动续费逻辑一致）；
-	// 若已过期超过 30 天则从今天起算，避免积压太久的节点一次性顺延过多。
-	baseTime := now
-	if client.ExpiredAt != nil {
-		expiredAt := client.ExpiredAt.In(time.Local)
-		if expiredAt.After(now.AddDate(0, 0, -30)) {
-			baseTime = expiredAt
-		}
-	}
-	newExpiredAt := baseTime.AddDate(0, 0, client.SignInIntervalDays)
+	// 快捷签到统一从当前时间起算：今天 + 顺延天数 + 偏移天数(可正可负)。
+	// 偏移值让用户微调最终落到哪一天，不受 sign_in_target_date 残留值影响。
+	newExpiredAt := now.AddDate(0, 0, client.SignInIntervalDays+client.SignInOffsetDays)
 
 	updates := map[string]interface{}{
 		"expired_at":            newExpiredAt,

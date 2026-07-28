@@ -41,6 +41,7 @@ type Client struct {
 	SignInAlertDaysBefore    int        `json:"sign_in_alert_days_before" gorm:"default:3"`
 	SignInAlertIntervalHours int        `json:"sign_in_alert_interval_hours" gorm:"default:12"`
 	SignInTargetDate         *time.Time `json:"sign_in_target_date" gorm:"type:timestamp"`
+	SignInOffsetDays         int        `json:"sign_in_offset_days" gorm:"default:0"` // 快捷签到偏移天数(可正可负)，在「今天+顺延天数」基础上微调最终到期日
 	LastSignInAlertAt        time.Time  `json:"last_sign_in_alert_at" gorm:"type:timestamp"`
 	Group                    string     `json:"group" gorm:"type:varchar(100)"`
 	Tags                     string     `json:"tags" gorm:"type:text"` // split by ';'
