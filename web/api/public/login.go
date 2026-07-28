@@ -17,13 +17,12 @@ import (
 )
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	TwoFa    string `json:"2fa_code"`
-	Remember bool   `json:"remember"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	TwoFa       string `json:"2fa_code"`
+	Remember    bool   `json:"remember"`
+	RememberDays int   `json:"remember_days"`
 }
-
-const sessionCookieMaxAge = 2592000
 
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
 	http.SetCookie(c.Writer, &http.Cookie{
@@ -91,16 +90,22 @@ func Login(c *gin.Context) {
 	}
 	// 登录成功，清除失败计数。
 	loginlimiter.Default.Reset(limiterKey)
-	// Create session (Server side session persists for 30 days)
-	session, err := accounts.CreateSession(uuid, sessionCookieMaxAge, c.Request.UserAgent(), clientIP, "password")
+	// 计算 session 持久时长：优先用前端传入的天数，默认 30 天
+	rememberDays := data.RememberDays
+	if rememberDays <= 0 {
+		rememberDays = 30
+	}
+	sessionMaxAge := rememberDays * 86400
+	// Create session
+	session, err := accounts.CreateSession(uuid, sessionMaxAge, c.Request.UserAgent(), clientIP, "password")
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "Failed to create session: "+err.Error())
 		return
 	}
-	// Cookie Max-Age：勾选"记住我"才持久化 30 天，否则浏览器会话级
+	// Cookie Max-Age：勾选"记住我"才持久化，否则浏览器会话级
 	cookieMaxAge := 0
 	if data.Remember {
-		cookieMaxAge = sessionCookieMaxAge
+		cookieMaxAge = sessionMaxAge
 	}
 	setSessionCookie(c, session, cookieMaxAge)
 	auditlog.Log(c.ClientIP(), uuid, "logged in (password)", "login")

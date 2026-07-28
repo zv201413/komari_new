@@ -40,6 +40,7 @@ type Settings struct {
 	LoginNotification          bool    `json:"login_notification" default:"true"`          // 登录通知
 	TrafficLimitPercentage     float64 `json:"traffic_limit_percentage" default:"80.00"`   // 流量限制百分比，默认80.00%
 	Sudo2FaRequired            bool    `json:"sudo_2fa_required" default:"false"`          // 终端是否需要 2FA sudo token
+	Timezone                   string  `json:"timezone" default:""`                        // 全局时区（IANA），空字符串表示使用浏览器本地时区
 	UpdatedAt                  time.Time
 }
 
@@ -76,6 +77,7 @@ const (
 	LoginNotificationKey          = "login_notification"
 	TrafficLimitPercentageKey     = "traffic_limit_percentage"
 	Sudo2FaRequiredKey            = "sudo_2fa_required"
+	TimezoneKey                   = "timezone"
 	UpdatedAtKey                  = "updated_at"
 	XtermjsSettingsKey            = "xtermjs_settings"
 	ThemeMarketSourcesKey         = "theme_market_sources"

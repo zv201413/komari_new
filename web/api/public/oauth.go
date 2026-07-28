@@ -101,15 +101,15 @@ func OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	// 创建会话
-	session, err := accounts.CreateSession(user.UUID, sessionCookieMaxAge, c.Request.UserAgent(), c.ClientIP(), "oauth")
+	// 创建会话（OAuth 登录固定 30 天）
+	session, err := accounts.CreateSession(user.UUID, 30*86400, c.Request.UserAgent(), c.ClientIP(), "oauth")
 	if err != nil {
 		c.JSON(500, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
 
 	// 设置cookie并返回
-	setSessionCookie(c, session, sessionCookieMaxAge)
+	setSessionCookie(c, session, 30*86400)
 	auditlog.Log(c.ClientIP(), user.UUID, "logged in (OAuth)", "login")
 	c.Redirect(302, "/admin")
 }
