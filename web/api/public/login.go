@@ -76,16 +76,30 @@ func Login(c *gin.Context) {
 		return
 	}
 	// 2FA
+	// 白名单豁免：clientIP 命中用户 IP 白名单时，跳过登录环节的动态码校验。
+	// IP 取自 c.ClientIP()，Gin 已收窄 trustedProxies 至本机并强制读 X-Real-IP
+	// （见 internal/server/runtime.go），客户端无法通过伪造 X-Forwarded-For 冒充白名单 IP。
+	// 注意：本豁免只作用于登录，终端仍需经 /api/admin/sudo-auth 重新验证 2FA 换取 sudo_token。
 	user, _ := accounts.GetUserByUUID(uuid)
+	loginMethod := "password"
 	if user.TwoFactor != "" { // 开启了2FA
-		if data.TwoFa == "" {
-			api.RespondError(c, http.StatusUnauthorized, "2FA code is required")
-			return
+		trusted, terr := accounts.IsTrustedIP(uuid, clientIP)
+		if terr != nil {
+			// 查询失败时不豁免，回退到强制 2FA，避免因数据库异常导致鉴权被削弱。
+			trusted = false
 		}
-		if ok, err := accounts.Verify2Fa(uuid, data.TwoFa); err != nil || !ok {
-			loginlimiter.Default.Fail(limiterKey)
-			api.RespondError(c, http.StatusUnauthorized, "Invalid 2FA code")
-			return
+		if trusted {
+			loginMethod = "password+trusted_ip"
+		} else {
+			if data.TwoFa == "" {
+				api.RespondError(c, http.StatusUnauthorized, "2FA code is required")
+				return
+			}
+			if ok, err := accounts.Verify2Fa(uuid, data.TwoFa); err != nil || !ok {
+				loginlimiter.Default.Fail(limiterKey)
+				api.RespondError(c, http.StatusUnauthorized, "Invalid 2FA code")
+				return
+			}
 		}
 	}
 	// 登录成功，清除失败计数。
@@ -97,7 +111,7 @@ func Login(c *gin.Context) {
 	}
 	sessionMaxAge := rememberDays * 86400
 	// Create session
-	session, err := accounts.CreateSession(uuid, sessionMaxAge, c.Request.UserAgent(), clientIP, "password")
+	session, err := accounts.CreateSession(uuid, sessionMaxAge, c.Request.UserAgent(), clientIP, loginMethod)
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "Failed to create session: "+err.Error())
 		return
@@ -108,7 +122,7 @@ func Login(c *gin.Context) {
 		cookieMaxAge = sessionMaxAge
 	}
 	setSessionCookie(c, session, cookieMaxAge)
-	auditlog.Log(c.ClientIP(), uuid, "logged in (password)", "login")
+	auditlog.Log(clientIP, uuid, "logged in ("+loginMethod+")", "login")
 	api.RespondSuccess(c, gin.H{"set-cookie": gin.H{"session_token": session}})
 }
 func Logout(c *gin.Context) {

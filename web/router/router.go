@@ -124,6 +124,15 @@ func registerAdminRoutes(r *gin.Engine) {
 	g.POST("/sudo-auth", admin.SudoAuth)
 	g.GET("/sudo-check", admin.SudoCheck)
 
+	// IP 白名单：白名单内 IP 登录免输 2FA 动态码，但增删白名单本身强制 2FA。
+	// 终端仍走 sudo_token，不受白名单影响。
+	trustedIPs := g.Group("/trusted-ips")
+	{
+		trustedIPs.GET("", admin.GetTrustedIPs)
+		trustedIPs.POST("/add", api.RequireSensitive2FA(), admin.AddTrustedIP)
+		trustedIPs.POST("/remove", api.RequireSensitive2FA(), admin.RemoveTrustedIP)
+	}
+
 	// oauth2 绑定走重定向，保留 REST handler。
 	oauth2 := g.Group("/oauth2")
 	{
