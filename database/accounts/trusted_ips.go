@@ -54,8 +54,10 @@ func RemoveTrustedIP(uuid, ip string) error {
 		return err
 	}
 
-	// 过滤掉目标 IP
-	newIPs := make([]string, 0, len(user.TrustedIPs))
+	// 过滤掉目标 IP。类型必须是 models.StringArray 而非 []string：
+	// 裸 []string 没有 driver.Valuer，GORM 会把它展开成行值 (?,?)，
+	// SQLite 报 "row value misused"。
+	newIPs := make(models.StringArray, 0, len(user.TrustedIPs))
 	for _, existingIP := range user.TrustedIPs {
 		if existingIP != ip {
 			newIPs = append(newIPs, existingIP)
