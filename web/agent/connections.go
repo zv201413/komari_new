@@ -61,6 +61,9 @@ func DeleteClientConditionally(uuid string, connToRemove *connection.SafeConn) {
 	if currentConn, exists := connectedClients[uuid]; exists && currentConn == connToRemove {
 		delete(connectedClients, uuid)
 		delete(connectedClientV2, uuid)
+		if source := sourceIPs[uuid]; source.connectionID == connToRemove.ID {
+			delete(sourceIPs, uuid)
+		}
 	}
 }
 func DeleteConnectedClients(uuid string) {
@@ -69,6 +72,7 @@ func DeleteConnectedClients(uuid string) {
 	// 只从 map 中删除，不再负责关闭连接
 	delete(connectedClients, uuid)
 	delete(connectedClientV2, uuid)
+	delete(sourceIPs, uuid)
 }
 
 // SetPresence sets or clears presence for non-WebSocket agents.

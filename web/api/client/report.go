@@ -117,14 +117,9 @@ func UploadReport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
-	// 优先使用 body 中的 UUID，若为空则从中间件注入的上下文中获取
-	uuid := report.UUID
-	if uuid == "" {
-		if v, ok := c.Get("client_uuid"); ok {
-			uuid, _ = v.(string)
-		}
-	}
-	if uuid == "" {
+	// Bind presence and source trust to the authenticated token, never a body UUID.
+	uuid, authenticated := clientUUIDFromContext(c)
+	if !authenticated {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "UUID is required"})
 		return
 	}
@@ -134,6 +129,7 @@ func UploadReport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("%v", err)})
 		return
 	}
+	agent_runtime.RecordSourceIP(uuid, verifiedClientToken(c), c.ClientIP(), 0, postPresenceTTL)
 
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Restore the body for further use
 	c.JSON(200, gin.H{"status": "success"})
@@ -194,6 +190,7 @@ func WebSocketReport(c *gin.Context) {
 		go oldConn.Close()
 	}
 	agent_runtime.SetConnectedClients(uuid, conn)
+	agent_runtime.RecordSourceIP(uuid, token, c.ClientIP(), conn.ID, 0)
 	logger.Infof("client-api", "Client %s is reconnect success, connID: %d", uuid, conn.ID)
 	notifier.OnlineNotification(uuid, conn.ID)
 	defer func() {

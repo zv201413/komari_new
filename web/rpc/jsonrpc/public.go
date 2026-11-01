@@ -60,6 +60,9 @@ func publicGetNodesInformation(ctx context.Context, _ *rpc.JsonRpcRequest) (any,
 		clientList[i].Remark = ""
 		clientList[i].Version = ""
 		clientList[i].Token = ""
+		if !isLogin {
+			clientList[i].TrustLoginIP = false
+		}
 		clientList[j] = clientList[i]
 		j++
 	}

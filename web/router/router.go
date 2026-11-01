@@ -122,7 +122,6 @@ func registerAdminRoutes(r *gin.Engine) {
 
 	// sudo（fork 特性：终端 2FA 二次验证，登录后凭 sudo_token 免重输）
 	g.POST("/sudo-auth", admin.SudoAuth)
-	g.GET("/sudo-check", admin.SudoCheck)
 
 	// IP 白名单：白名单内 IP 登录免输 2FA 动态码；新增需 2FA，删除仅需管理员身份。
 	// 终端仍走 sudo_token，不受白名单影响。
@@ -176,6 +175,8 @@ func registerAdminRoutes(r *gin.Engine) {
 	// clients
 	clientGroup := g.Group("/client")
 	{
+		clientGroup.GET("/ip-trust-policy", admin.GetNodeIPTrustPolicy)
+		clientGroup.POST("/ip-trust-policy", admin.SetNodeIPTrustPolicy)
 		clientGroup.POST("/add", jsonRpc.Bind("admin:addClient", jsonRpc.WithFlat()))
 		clientGroup.GET("/list", jsonRpc.Bind("admin:listClients", jsonRpc.WithRaw()))
 		clientGroup.GET("/:uuid", jsonRpc.Bind("admin:getClient", jsonRpc.WithPath("uuid"), jsonRpc.WithRaw()))
@@ -184,6 +185,8 @@ func registerAdminRoutes(r *gin.Engine) {
 		clientGroup.GET("/:uuid/token", jsonRpc.Bind("admin:getClientToken", jsonRpc.WithPath("uuid"), jsonRpc.WithFlat()))
 		clientGroup.POST("/order", jsonRpc.Bind("admin:orderClients"))
 		clientGroup.POST("/:uuid/sign-in", admin.ClientSignIn)
+		clientGroup.POST("/:uuid/trust-login-ip", admin.SetClientLoginIPTrust)
+		clientGroup.GET("/:uuid/sudo-check", admin.SudoCheck)
 		// 终端鉴权走 fork 的 sudo_token 流程（RequestTerminal 内部按 sudo_2fa_required 开关校验），
 		// 不用上游的 RequireSensitive2FA（那会要求前端每次连接都带 2fa_code）。
 		clientGroup.GET("/:uuid/terminal", terminal.RequestTerminal)

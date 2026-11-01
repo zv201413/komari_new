@@ -246,6 +246,7 @@ func getNodes(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcEr
 			}
 
 			node.Remark = ""
+			node.TrustLoginIP = false
 			node.Version = ""
 			node.Token = ""
 			filtered = append(filtered, node)

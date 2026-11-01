@@ -48,6 +48,7 @@ func IdentityMiddleware() gin.HandlerFunc {
 			c.Set("uuid", p.UserUUID)
 		case rpc.PrincipalAgent:
 			c.Set("client_uuid", p.ClientUUID)
+			c.Set("client_token", extractClientToken(c))
 		}
 
 		c.Next()

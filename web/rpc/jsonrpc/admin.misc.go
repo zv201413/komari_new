@@ -135,6 +135,11 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	if err := req.BindParams(&cfg); err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing request body: "+err.Error(), nil)
 	}
+	for _, key := range []string{config.NodeIPTrustEnabledKey, config.NodeIPTrustEpochKey} {
+		if _, exists := cfg[key]; exists {
+			return nil, rpc.MakeError(rpc.PermissionDenied, "Use the node IP trust policy endpoint", nil)
+		}
+	}
 
 	// 关闭 sudo_2fa_required 属敏感操作：需校验管理员 2FA 动态码，
 	// 防止终端 sudo token 保护被静默解除。2FA code 走 RPC 命名参数(2fa_code/two_factor_code/otp)传递。

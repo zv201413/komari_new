@@ -112,6 +112,9 @@ func UploadV2RPC(c *gin.Context) {
 		return
 	}
 	resp := handleV2RPC(uuid, req, true)
+	if resp.Error == nil && (req.Method == v2.MethodAgentReport || req.Method == v2.MethodAgentPull) {
+		agent_runtime.RecordSourceIP(uuid, verifiedClientToken(c), c.ClientIP(), 0, postPresenceTTL)
+	}
 	status := http.StatusOK
 	if resp.Error != nil {
 		status = http.StatusBadRequest
@@ -141,6 +144,7 @@ func WebSocketV2RPC(c *gin.Context) {
 		go oldConn.Close()
 	}
 	agent_runtime.SetConnectedClients(uuid, conn)
+	agent_runtime.RecordSourceIP(uuid, verifiedClientToken(c), c.ClientIP(), conn.ID, 0)
 	agent_runtime.SetClientProtocolVersion(uuid, 2)
 	go notifierOnline(uuid, conn.ID)
 	defer func() {
@@ -201,12 +205,22 @@ func clientUUIDFromContext(c *gin.Context) (string, bool) {
 			return uuid, true
 		}
 	}
-	token := c.Query("token")
+	token := verifiedClientToken(c)
 	if token == "" {
 		return "", false
 	}
 	uuid, err := clients.GetClientUUIDByToken(token)
 	return uuid, err == nil && uuid != ""
+}
+
+func verifiedClientToken(c *gin.Context) string {
+	if token := c.GetString("client_token"); token != "" {
+		return token
+	}
+	if token := c.Query("token"); token != "" {
+		return token
+	}
+	return c.Query("Authorization")
 }
 
 func notifierOnline(uuid string, connID int64) {

@@ -25,6 +25,8 @@ func DeleteClient(clientUuid string) error {
 }
 
 func SaveClientInfo(update map[string]interface{}) error {
+	// Agent-reported metadata must never change the administrator's trust policy.
+	delete(update, "trust_login_ip")
 	db := dbcore.GetDBInstance()
 	clientUUID, ok := update["uuid"].(string)
 	if !ok || clientUUID == "" {
@@ -211,6 +213,8 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 }
 
 func SaveClient(updates map[string]interface{}) error {
+	// Trust changes go through the dedicated, 2FA-protected handler.
+	delete(updates, "trust_login_ip")
 	db := dbcore.GetDBInstance()
 	clientUUID, ok := updates["uuid"].(string)
 	if !ok || clientUUID == "" {

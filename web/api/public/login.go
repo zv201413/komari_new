@@ -17,11 +17,11 @@ import (
 )
 
 type LoginRequest struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	TwoFa       string `json:"2fa_code"`
-	Remember    bool   `json:"remember"`
-	RememberDays int   `json:"remember_days"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	TwoFa        string `json:"2fa_code"`
+	Remember     bool   `json:"remember"`
+	RememberDays int    `json:"remember_days"`
 }
 
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
@@ -80,7 +80,11 @@ func Login(c *gin.Context) {
 	// IP 取自 c.ClientIP()，Gin 已收窄 trustedProxies 至本机并强制读 X-Real-IP
 	// （见 internal/server/runtime.go），客户端无法通过伪造 X-Forwarded-For 冒充白名单 IP。
 	// 注意：本豁免只作用于登录，终端仍需经 /api/admin/sudo-auth 重新验证 2FA 换取 sudo_token。
-	user, _ := accounts.GetUserByUUID(uuid)
+	user, err := accounts.GetUserByUUID(uuid)
+	if err != nil {
+		api.RespondError(c, http.StatusInternalServerError, "Failed to load account")
+		return
+	}
 	loginMethod := "password"
 	if user.TwoFactor != "" { // 开启了2FA
 		trusted, terr := accounts.IsTrustedIP(uuid, clientIP)
@@ -90,6 +94,8 @@ func Login(c *gin.Context) {
 		}
 		if trusted {
 			loginMethod = "password+trusted_ip"
+		} else if trustedAgentLoginIP(clientIP) {
+			loginMethod = "password+trusted_agent_ip"
 		} else {
 			if data.TwoFa == "" {
 				api.RespondError(c, http.StatusUnauthorized, "2FA code is required")
