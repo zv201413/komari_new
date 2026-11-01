@@ -115,6 +115,8 @@ cd komari-web_new && npm install && npm run build
 # 服务端
 git clone https://github.com/zv201413/komari_new
 cd komari_new
-cp -r ../komari-web_new/public/defaultTheme/dist public/defaultTheme/
+mkdir -p web/public/defaultTheme/dist
+cp -r ../komari-web_new/dist/. web/public/defaultTheme/dist/
+cp ../komari-web_new/komari-theme.json web/public/defaultTheme/
 go build -o komari
 ```

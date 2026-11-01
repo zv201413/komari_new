@@ -127,7 +127,7 @@ func TestSessionCookieSecureFollowsRequestScheme(t *testing.T) {
 			c, _ := gin.CreateTestContext(w)
 			c.Request = httptest.NewRequest(http.MethodGet, tt.requestURL, nil)
 
-			setSessionCookie(c, "test-session", sessionCookieMaxAge)
+			setSessionCookie(c, "test-session", 30*86400)
 
 			setCookie := strings.Join(w.Header().Values("Set-Cookie"), "\n")
 			if tt.wantSecure {

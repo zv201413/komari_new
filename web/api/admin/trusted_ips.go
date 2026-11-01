@@ -59,7 +59,7 @@ type removeTrustedIPRequest struct {
 	IP string `json:"ip"`
 }
 
-// RemoveTrustedIP 从白名单删除 IP（需要 2FA 验证）
+// RemoveTrustedIP 从白名单删除 IP（仅需管理员身份，撤销信任无需 2FA）
 // POST /api/admin/trusted-ips/remove
 func RemoveTrustedIP(c *gin.Context) {
 	uuid, _ := c.Get("uuid")

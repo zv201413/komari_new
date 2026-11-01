@@ -2,6 +2,7 @@ package public
 
 import (
 	"io"
+	"io/fs"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -83,7 +84,11 @@ func TestStaticRestrictedDoesNotServeCustomAssetOverride(t *testing.T) {
 	if err := os.MkdirAll(assetPath, 0o755); err != nil {
 		t.Fatalf("create custom theme asset directory: %v", err)
 	}
-	const assetName = "about-D4JKo971.css"
+	assets, err := fs.Glob(PublicFS, "defaultTheme/dist/assets/*.css")
+	if err != nil || len(assets) == 0 {
+		t.Fatalf("embedded frontend CSS is missing: %v", err)
+	}
+	assetName := filepath.Base(assets[0])
 	if err := os.WriteFile(filepath.Join(assetPath, assetName), []byte("custom override"), 0o644); err != nil {
 		t.Fatalf("write custom theme asset: %v", err)
 	}
