@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"net/netip"
 	"time"
+
+	"github.com/komari-monitor/komari/database/models"
 )
 
 type observedSource struct {
@@ -74,17 +76,55 @@ func MatchesSourceIP(uuid, currentToken, rawIP string) bool {
 	if !ok {
 		return false
 	}
+	return VerifiedSourceIP(uuid, currentToken) == ip.String()
+}
+
+// VerifiedSourceIP exposes only the source of a live, authenticated connection.
+// It never falls back to metadata claimed by the agent.
+func VerifiedSourceIP(uuid, currentToken string) string {
 	mu.RLock()
 	defer mu.RUnlock()
 	source, ok := sourceIPs[uuid]
-	if !ok || source.ip != ip || source.tokenHash != sha256.Sum256([]byte(currentToken)) {
-		return false
+	if !ok || source.tokenHash != sha256.Sum256([]byte(currentToken)) {
+		return ""
 	}
 	if source.connectionID != 0 {
 		conn := connectedClients[uuid]
-		return conn != nil && conn.ID == source.connectionID
+		if conn != nil && conn.ID == source.connectionID {
+			return source.ip.String()
+		}
+		return ""
 	}
 	presence, ok := presenceOnly[uuid]
 	now := time.Now()
-	return ok && presence.expire.After(now) && source.expiresAt.After(now)
+	if ok && presence.expire.After(now) && source.expiresAt.After(now) {
+		return source.ip.String()
+	}
+	return ""
+}
+
+func matchesDisplayedIP(rawIP, ipv4, ipv6 string) bool {
+	ip, ok := publicAddress(rawIP)
+	if !ok {
+		return false
+	}
+	for _, displayed := range []string{ipv4, ipv6} {
+		candidate, valid := publicAddress(displayed)
+		if valid && candidate == ip {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchesLoginIP requires both administrator-visible metadata and proof from
+// the current connection. An unlisted NAT64/proxy exit is never trusted.
+func MatchesLoginIP(uuid, token, ipv4, ipv6, loginIP string) bool {
+	return matchesDisplayedIP(loginIP, ipv4, ipv6) && MatchesSourceIP(uuid, token, loginIP)
+}
+
+// PopulateClientIPTrust is called only by authenticated administrator responses.
+func PopulateClientIPTrust(node *models.Client) {
+	node.ConnectionSourceIP = VerifiedSourceIP(node.UUID, node.Token)
+	node.IPTrustEligible = matchesDisplayedIP(node.ConnectionSourceIP, node.IPv4, node.IPv6)
 }

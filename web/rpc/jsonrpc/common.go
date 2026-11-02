@@ -226,6 +226,11 @@ func getNodes(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcEr
 	meta := rpc.MetaFromContext(ctx)
 
 	SendIpAddrToGuest, _ := config.GetAs[bool](config.SendIpAddrToGuestKey)
+	if meta.Principal != nil && meta.Principal.HasRole(rpc.RoleAdmin) {
+		for i := range cinfo {
+			agent_runtime.PopulateClientIPTrust(&cinfo[i])
+		}
+	}
 	if meta.Principal == nil || !meta.Principal.HasRole(rpc.RoleAdmin) {
 		// 过滤 Hidden 节点并隐藏敏感字段
 		filtered := make([]models.Client, 0, len(cinfo))

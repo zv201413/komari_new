@@ -23,7 +23,9 @@ type Client struct {
 	GpuName                  string     `json:"gpu_name" gorm:"type:varchar(100)"`
 	IPv4                     string     `json:"ipv4,omitempty" gorm:"type:varchar(100)"`
 	IPv6                     string     `json:"ipv6,omitempty" gorm:"type:varchar(100)"`
-	TrustLoginIP             bool       `json:"trust_login_ip,omitempty" gorm:"default:false"` // Opt in to login-only 2FA exemption for this agent's observed public source IP.
+	TrustLoginIP             bool       `json:"trust_login_ip,omitempty" gorm:"default:false"` // Only a displayed IP matching the authenticated connection can exempt login 2FA.
+	ConnectionSourceIP       string     `json:"connection_source_ip,omitempty" gorm:"-"`
+	IPTrustEligible          bool       `json:"ip_trust_eligible,omitempty" gorm:"-"`
 	Region                   string     `json:"region" gorm:"type:varchar(100)"`
 	Remark                   string     `json:"remark,omitempty" gorm:"type:longtext"`
 	PublicRemark             string     `json:"public_remark,omitempty" gorm:"type:longtext"`

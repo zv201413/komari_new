@@ -41,10 +41,12 @@ func TestNodeSecurityPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, node := range []models.Client{{UUID: "security-node-a", Token: "security-token-a", Name: "A"}, {UUID: "security-node-b", Token: "security-token-b", Name: "B"}} {
+	for _, node := range []models.Client{{UUID: "security-node-a", Token: "security-token-a", Name: "A", IPv4: "8.8.8.8"}, {UUID: "security-node-b", Token: "security-token-b", Name: "B", IPv4: "8.8.8.8"}} {
 		if err := db.Create(&node).Error; err != nil {
 			t.Fatal(err)
 		}
+		agent_runtime.KeepAlivePresence(node.UUID, 1, time.Minute)
+		agent_runtime.RecordSourceIP(node.UUID, node.Token, "8.8.8.8", 0, time.Minute)
 	}
 	if err := config.Set(config.Sudo2FaRequiredKey, true); err != nil {
 		t.Fatal(err)
@@ -57,12 +59,15 @@ func TestNodeSecurityPolicy(t *testing.T) {
 		clients.DeleteClient("security-node-a")
 		clients.DeleteClient("security-node-b")
 		agent_runtime.DeleteConnectedClients("security-node-a")
+		agent_runtime.DeleteConnectedClients("security-node-b")
+		agent_runtime.SetPresence("security-node-a", 1, false)
+		agent_runtime.SetPresence("security-node-b", 1, false)
 	})
 	r := gin.New()
 	r.SetTrustedProxies(nil)
 	r.Use(api.IdentityMiddleware())
 	registerAdminRoutes(r)
-	r.POST("/api/login", public.Login)
+	registerPublicRoutes(r)
 	call := func(method, path, session, body, code string, cookie *http.Cookie, upgrade bool) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
@@ -139,6 +144,34 @@ func TestNodeSecurityPolicy(t *testing.T) {
 	want(call("POST", "/api/login", "", string(login), "", nil, false), 200)
 	wrongPassword, _ := json.Marshal(public.LoginRequest{Username: user.Username, Password: "wrong"})
 	want(call("POST", "/api/login", "", string(wrongPassword), "", nil, false), 401)
+	// A legacy enabled switch must not trust an unlisted NAT64 IPv4 exit.
+	if err := clients.SaveClientInfo(map[string]interface{}{"uuid": a.UUID, "ipv4": "", "ipv6": "2001:4860:4860::8888"}); err != nil {
+		t.Fatal(err)
+	}
+	want(call("POST", "/api/login", "", string(login), "", nil, false), 401)
+	want(call("POST", path, "node-security-session", `{"enabled":true}`, "", masterGrant, false), 409)
+	list := call("GET", "/api/admin/client/list", "node-security-session", "", "", nil, false)
+	want(list, 200)
+	var nodes []models.Client
+	if err := json.Unmarshal(list.Body.Bytes(), &nodes); err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range nodes {
+		if node.UUID == a.UUID && (node.ConnectionSourceIP != "8.8.8.8" || node.IPTrustEligible || node.IPv6 != "2001:4860:4860::8888") {
+			t.Fatalf("incorrect NAT64 metadata: %+v", node)
+		}
+	}
+	guestNodes := call("GET", "/api/nodes", "", "", "", nil, false)
+	want(guestNodes, 200)
+	if bytes.Contains(guestNodes.Body.Bytes(), []byte("connection_source_ip")) || bytes.Contains(guestNodes.Body.Bytes(), []byte("ip_trust_eligible")) {
+		t.Fatal("connection source disclosed to guests")
+	}
+	// A self-reported native address cannot exempt another IP. Once the
+	// displayed IPv4 matches the verified source, its exemption resumes.
+	if err := clients.SaveClientInfo(map[string]interface{}{"uuid": a.UUID, "ipv4": "8.8.8.8", "ipv6": ""}); err != nil {
+		t.Fatal(err)
+	}
+	want(call("POST", "/api/login", "", string(login), "", nil, false), 200)
 	// Closing the valve suspends all exemptions and preserves node choices.
 	want(call("POST", masterPath, "node-security-session", `{"enabled":false}`, "", masterGrant, false), 401)
 	want(call("POST", masterPath, "node-security-session", `{"enabled":false}`, code, masterGrant, false), 200)
@@ -160,10 +193,11 @@ func TestNodeSecurityPolicy(t *testing.T) {
 		}
 	}
 	want(call("POST", path, "node-security-other-session", `{"enabled":true}`, "", masterGrant, false), 401)
-	// The manually reported display IP is never sufficient to grant trust.
+	// The display IP and live connection must both be verified.
 	want(call("POST", path, "node-security-session", `{"enabled":true}`, "", masterGrant, false), 200)
 	agent_runtime.SetPresence(a.UUID, 1, false)
 	want(call("POST", "/api/login", "", string(login), "", nil, false), 401)
+	want(call("POST", path, "node-security-session", `{"enabled":true}`, "", masterGrant, false), 409)
 
 	want(call("POST", "/api/admin/sudo-auth", "node-security-session", `{"2fa_code":"`+code+`","duration":"1h"}`, "", nil, false), 400)
 	auth := call("POST", "/api/admin/sudo-auth", "node-security-session", `{"uuid":"security-node-a","2fa_code":"`+code+`","duration":"1h"}`, "", nil, false)
@@ -183,4 +217,45 @@ func TestNodeSecurityPolicy(t *testing.T) {
 	want(call("GET", "/api/admin/client/security-node-b/terminal", "node-security-session", "", "", grant, true), 401)
 	legacy := &http.Cookie{Name: "sudo_token", Value: grant.Value}
 	want(call("GET", "/api/admin/client/security-node-a/sudo-check", "node-security-session", "", "", legacy, false), 401)
+
+	{
+		// Exercise the same deletion endpoint as the node table, with two
+		// trusted agents sharing an exit IP and an independent manual entry.
+		agent_runtime.KeepAlivePresence(b.UUID, 1, time.Minute)
+		agent_runtime.RecordSourceIP(b.UUID, b.Token, "8.8.8.8", 0, time.Minute)
+		want(call("POST", nodeBPath, "node-security-session", `{"enabled":true}`, "", masterGrant, false), 200)
+		b, _ = clients.GetClientByUUID("security-node-b")
+		for _, node := range []models.Client{a, b} {
+			agent_runtime.KeepAlivePresence(node.UUID, 1, time.Minute)
+			agent_runtime.RecordSourceIP(node.UUID, node.Token, "8.8.8.8", 0, time.Minute)
+		}
+		want(call("POST", "/api/login", "", string(login), "", nil, false), 200)
+		want(call("POST", "/api/admin/client/security-node-a/remove", "", "", "", nil, false), 401)
+		want(call("POST", "/api/admin/client/security-node-a/remove", "node-security-session", "", "", nil, false), 200)
+		if _, err := clients.GetClientByUUID(a.UUID); err == nil {
+			t.Fatal("deleted node still exists")
+		}
+		if agent_runtime.MatchesSourceIP(a.UUID, a.Token, "8.8.8.8") {
+			t.Fatal("deleted node retained its observed source IP")
+		}
+		// Node B still authorizes the shared IP until its own trust is revoked.
+		want(call("POST", "/api/login", "", string(login), "", nil, false), 200)
+		want(call("POST", nodeBPath, "node-security-session", `{"enabled":false}`, "", nil, false), 200)
+		want(call("POST", "/api/login", "", string(login), "", nil, false), 401)
+		want(call("POST", nodeBPath, "node-security-session", `{"enabled":true}`, "", masterGrant, false), 200)
+		if err := accounts.AddTrustedIP(user.UUID, "8.8.8.8"); err != nil {
+			t.Fatal(err)
+		}
+		want(call("POST", "/api/admin/client/security-node-b/remove", "node-security-session", "", "", nil, false), 200)
+		if agent_runtime.MatchesSourceIP(b.UUID, b.Token, "8.8.8.8") {
+			t.Fatal("last deleted node retained its observed source IP")
+		}
+		// Deleting an automatic grant must not delete an explicitly added IP.
+		if trusted, err := accounts.IsTrustedIP(user.UUID, "8.8.8.8"); err != nil || !trusted {
+			t.Fatalf("manual trust was lost: trusted=%v, err=%v", trusted, err)
+		}
+		want(call("POST", "/api/login", "", string(login), "", nil, false), 200)
+		want(call("POST", "/api/admin/trusted-ips/remove", "node-security-session", `{"ip":"8.8.8.8"}`, "", nil, false), 200)
+		want(call("POST", "/api/login", "", string(login), "", nil, false), 401)
+	}
 }

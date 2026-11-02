@@ -14,6 +14,7 @@ import (
 	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/sudotoken"
+	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	"github.com/komari-monitor/komari/web/api"
 )
 
@@ -114,7 +115,8 @@ func SetClientLoginIPTrust(c *gin.Context) {
 		return
 	}
 	uuid := c.Param("uuid")
-	if _, err := clients.GetClientByUUID(uuid); err != nil {
+	node, err := clients.GetClientByUUID(uuid)
+	if err != nil {
 		api.RespondError(c, http.StatusNotFound, "Client not found")
 		return
 	}
@@ -122,6 +124,11 @@ func SetClientLoginIPTrust(c *gin.Context) {
 	defer ipTrustPolicyMu.Unlock()
 	if *req.Enabled && !ipTrustUnlocked(c) {
 		api.RespondError(c, http.StatusUnauthorized, "Verify the IP trust master switch before changing nodes")
+		return
+	}
+	agent_runtime.PopulateClientIPTrust(&node)
+	if *req.Enabled && !node.IPTrustEligible {
+		api.RespondError(c, http.StatusConflict, "IP trust requires a displayed node IP matching its live connection source; NAT64/proxy exits are not trusted")
 		return
 	}
 	if err := dbcore.GetDBInstance().Model(&models.Client{}).Where("uuid = ?", uuid).

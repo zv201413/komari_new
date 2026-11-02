@@ -188,6 +188,7 @@ func adminGetClient(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonR
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	agent_runtime.PopulateClientIPTrust(&result)
 	return result, nil
 }
 
@@ -195,6 +196,9 @@ func adminListClients(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonR
 	cls, err := clients.GetAllClientBasicInfo()
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+	}
+	for i := range cls {
+		agent_runtime.PopulateClientIPTrust(&cls[i])
 	}
 	return cls, nil
 }

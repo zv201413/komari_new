@@ -41,6 +41,8 @@ Komari 是一款轻量级服务器监控工具，支持通过网页面板查看�
 
 👉 [查看完整增强特性说明](./docs/features.md)
 
+节点列表“信任 IP”与删除节点的联动见 [节点删除与登录 IP 信任](./docs/node-ip-trust.md)。
+
 ## Quick Start
 
 ### Option A: Binary

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/komari-monitor/komari/database/models"
 	"github.com/komari-monitor/komari/web/connection"
 )
 
@@ -65,5 +66,36 @@ func TestNonPublicSourcesNeverTrusted(t *testing.T) {
 		if _, ok := publicAddress(ip); ok {
 			t.Fatalf("nonpublic IP accepted: %s", ip)
 		}
+	}
+}
+
+func TestVisibleIPRequiredForLoginTrust(t *testing.T) {
+	const uuid = "visible-ip-test"
+	const native = "2001:4860:4860::8888"
+	defer DeleteConnectedClients(uuid)
+	defer SetPresence(uuid, 1, false)
+	KeepAlivePresence(uuid, 1, time.Minute)
+	RecordSourceIP(uuid, "credential", "8.8.8.8", 0, time.Minute)
+	node := models.Client{UUID: uuid, Token: "credential", IPv6: native, TrustLoginIP: true}
+	PopulateClientIPTrust(&node)
+	if node.ConnectionSourceIP != "8.8.8.8" || node.IPTrustEligible {
+		t.Fatal("NAT64 source must be visible but ineligible")
+	}
+	if MatchesLoginIP(uuid, node.Token, node.IPv4, node.IPv6, "8.8.8.8") || MatchesLoginIP(uuid, node.Token, node.IPv4, node.IPv6, native) {
+		t.Fatal("unlisted exit or unverified native address gained trust")
+	}
+	node.IPv4 = "::ffff:8.8.8.8"
+	PopulateClientIPTrust(&node)
+	if !node.IPTrustEligible || !MatchesLoginIP(uuid, node.Token, node.IPv4, node.IPv6, "8.8.8.8") {
+		t.Fatal("equivalent displayed source was rejected")
+	}
+	RecordSourceIP(uuid, "credential", native, 0, time.Minute)
+	if !MatchesLoginIP(uuid, node.Token, "", native, "2001:4860:4860:0:0:0:0:8888") {
+		t.Fatal("native IPv6 source was rejected")
+	}
+	node.Token = "rotated"
+	PopulateClientIPTrust(&node)
+	if node.ConnectionSourceIP != "" || node.IPTrustEligible {
+		t.Fatal("stale credential leaked source or trust eligibility")
 	}
 }
